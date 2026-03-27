@@ -33,7 +33,7 @@
 // mock objects are set here.
 // * * * * * * * * * * * * * * * * * * * * * * * *
 
-FOSSIL_TEST_SUITE(c_socket_fixture);
+FOSSIL_SUITE(c_socket_fixture);
 
 FOSSIL_SETUP(c_socket_fixture) {
     // Setup the test fixture
@@ -51,21 +51,21 @@ FOSSIL_TEARDOWN(c_socket_fixture) {
 // as samples for library usage.
 // * * * * * * * * * * * * * * * * * * * * * * * *
 
-FOSSIL_TEST_CASE(c_socket_test_socket_init_cleanup) {
+FOSSIL_TEST(c_socket_test_socket_init_cleanup) {
     int rc = fossil_network_socket_init();
     ASSUME_ITS_TRUE(rc == 0);
     rc = fossil_network_socket_cleanup();
     ASSUME_ITS_TRUE(rc == 0);
 }
 
-FOSSIL_TEST_CASE(c_socket_test_proto_name_conversion) {
+FOSSIL_TEST(c_socket_test_proto_name_conversion) {
     fossil_protocol_t proto = fossil_network_socket_proto_from_name("tcp");
     ASSUME_ITS_TRUE(proto != FOSSIL_PROTO_UNKNOWN);
     const char *name = fossil_network_socket_proto_to_name(proto);
     ASSUME_ITS_TRUE(name != NULL);
 }
 
-FOSSIL_TEST_CASE(c_socket_test_socket_create_close) {
+FOSSIL_TEST(c_socket_test_socket_create_close) {
     fossil_network_socket_t sock;
     int rc = fossil_network_socket_create(&sock, AF_INET, fossil_network_socket_proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
@@ -73,7 +73,7 @@ FOSSIL_TEST_CASE(c_socket_test_socket_create_close) {
     ASSUME_ITS_TRUE(rc == 0);
 }
 
-FOSSIL_TEST_CASE(c_socket_test_socket_bind_listen_close) {
+FOSSIL_TEST(c_socket_test_socket_bind_listen_close) {
     fossil_network_socket_t sock;
     int rc = fossil_network_socket_create(&sock, AF_INET, fossil_network_socket_proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
@@ -85,17 +85,17 @@ FOSSIL_TEST_CASE(c_socket_test_socket_bind_listen_close) {
     ASSUME_ITS_TRUE(rc == 0);
 }
 
-FOSSIL_TEST_CASE(c_socket_test_proto_from_name_unknown) {
+FOSSIL_TEST(c_socket_test_proto_from_name_unknown) {
     fossil_protocol_t proto = fossil_network_socket_proto_from_name("notarealproto");
     ASSUME_ITS_TRUE(proto == FOSSIL_PROTO_UNKNOWN);
 }
 
-FOSSIL_TEST_CASE(c_socket_test_proto_to_name_unknown) {
+FOSSIL_TEST(c_socket_test_proto_to_name_unknown) {
     const char *name = fossil_network_socket_proto_to_name(FOSSIL_PROTO_UNKNOWN);
     ASSUME_ITS_TRUE(strcmp(name, "unknown") == 0);
 }
 
-FOSSIL_TEST_CASE(c_socket_test_socket_set_get_option) {
+FOSSIL_TEST(c_socket_test_socket_set_get_option) {
     fossil_network_socket_t sock;
     int rc = fossil_network_socket_create(&sock, AF_INET, fossil_network_socket_proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
@@ -107,7 +107,7 @@ FOSSIL_TEST_CASE(c_socket_test_socket_set_get_option) {
     fossil_network_socket_close(&sock);
 }
 
-FOSSIL_TEST_CASE(c_socket_test_socket_set_nonblocking) {
+FOSSIL_TEST(c_socket_test_socket_set_nonblocking) {
     fossil_network_socket_t sock;
     int rc = fossil_network_socket_create(&sock, AF_INET, fossil_network_socket_proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
@@ -118,7 +118,7 @@ FOSSIL_TEST_CASE(c_socket_test_socket_set_nonblocking) {
     fossil_network_socket_close(&sock);
 }
 
-FOSSIL_TEST_CASE(c_socket_test_socket_is_ipv6) {
+FOSSIL_TEST(c_socket_test_socket_is_ipv6) {
     fossil_network_socket_t sock4, sock6;
     int rc = fossil_network_socket_create(&sock4, AF_INET, fossil_network_socket_proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
@@ -130,7 +130,7 @@ FOSSIL_TEST_CASE(c_socket_test_socket_is_ipv6) {
     fossil_network_socket_close(&sock6);
 }
 
-FOSSIL_TEST_CASE(c_socket_test_socket_open_close) {
+FOSSIL_TEST(c_socket_test_socket_open_close) {
     fossil_network_socket_t sock;
     int rc = fossil_network_socket_open(&sock, "tcp", "127.0.0.1", 0);
     // Should succeed in creating, even if connect fails (port 0 is invalid for connect)
@@ -138,13 +138,13 @@ FOSSIL_TEST_CASE(c_socket_test_socket_open_close) {
     fossil_network_socket_close(&sock);
 }
 
-FOSSIL_TEST_CASE(c_socket_test_socket_resolve_hostname) {
+FOSSIL_TEST(c_socket_test_socket_resolve_hostname) {
     char ip[64];
     int rc = fossil_network_socket_resolve_hostname("localhost", ip, sizeof(ip));
     ASSUME_ITS_TRUE(rc == 0);
 }
 
-FOSSIL_TEST_CASE(c_socket_test_socket_get_address_local) {
+FOSSIL_TEST(c_socket_test_socket_get_address_local) {
     fossil_network_socket_t sock;
     int rc = fossil_network_socket_create(&sock, AF_INET, fossil_network_socket_proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
@@ -156,7 +156,7 @@ FOSSIL_TEST_CASE(c_socket_test_socket_get_address_local) {
     fossil_network_socket_close(&sock);
 }
 
-FOSSIL_TEST_CASE(c_socket_test_socket_set_timeout) {
+FOSSIL_TEST(c_socket_test_socket_set_timeout) {
     fossil_network_socket_t sock;
     int rc = fossil_network_socket_create(&sock, AF_INET, fossil_network_socket_proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
