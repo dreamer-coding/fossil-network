@@ -34,6 +34,7 @@ fossil_network_lib = library(
 # ------------------------------
 fossil_network_dep = declare_dependency(
     link_with: [fossil_network_lib],
+    dependencies: [winsock_dep, bcrypt_dep],
     include_directories: dir
 )
 
