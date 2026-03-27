@@ -33,7 +33,7 @@
 // mock objects are set here.
 // * * * * * * * * * * * * * * * * * * * * * * * *
 
-FOSSIL_TEST_SUITE(cpp_socket_fixture);
+FOSSIL_SUITE(cpp_socket_fixture);
 
 FOSSIL_SETUP(cpp_socket_fixture) {
     // Setup the test fixture
@@ -51,21 +51,21 @@ FOSSIL_TEARDOWN(cpp_socket_fixture) {
 // as samples for library usage.
 // * * * * * * * * * * * * * * * * * * * * * * * *
 
-FOSSIL_TEST_CASE(cpp_socket_test_socket_init_cleanup) {
+FOSSIL_TEST(cpp_socket_test_socket_init_cleanup) {
     int rc = fossil::network::Socket::init();
     ASSUME_ITS_TRUE(rc == 0);
     rc = fossil::network::Socket::cleanup();
     ASSUME_ITS_TRUE(rc == 0);
 }
 
-FOSSIL_TEST_CASE(cpp_socket_test_proto_name_conversion) {
+FOSSIL_TEST(cpp_socket_test_proto_name_conversion) {
     fossil_protocol_t proto = fossil::network::Socket::proto_from_name("tcp");
     ASSUME_ITS_TRUE(proto != FOSSIL_PROTO_UNKNOWN);
     std::string name = fossil::network::Socket::proto_to_name(proto);
     ASSUME_ITS_TRUE(!name.empty());
 }
 
-FOSSIL_TEST_CASE(cpp_socket_test_socket_create_close) {
+FOSSIL_TEST(cpp_socket_test_socket_create_close) {
     fossil::network::Socket sock;
     int rc = sock.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
@@ -73,7 +73,7 @@ FOSSIL_TEST_CASE(cpp_socket_test_socket_create_close) {
     ASSUME_ITS_TRUE(rc == 0);
 }
 
-FOSSIL_TEST_CASE(cpp_socket_test_socket_bind_listen_close) {
+FOSSIL_TEST(cpp_socket_test_socket_bind_listen_close) {
     fossil::network::Socket sock;
     int rc = sock.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
@@ -85,17 +85,17 @@ FOSSIL_TEST_CASE(cpp_socket_test_socket_bind_listen_close) {
     ASSUME_ITS_TRUE(rc == 0);
 }
 
-FOSSIL_TEST_CASE(cpp_socket_test_proto_from_name_unknown) {
+FOSSIL_TEST(cpp_socket_test_proto_from_name_unknown) {
     fossil_protocol_t proto = fossil::network::Socket::proto_from_name("notarealproto");
     ASSUME_ITS_TRUE(proto == FOSSIL_PROTO_UNKNOWN);
 }
 
-FOSSIL_TEST_CASE(cpp_socket_test_proto_to_name_unknown) {
+FOSSIL_TEST(cpp_socket_test_proto_to_name_unknown) {
     std::string name = fossil::network::Socket::proto_to_name(FOSSIL_PROTO_UNKNOWN);
     ASSUME_ITS_TRUE(name == "unknown");
 }
 
-FOSSIL_TEST_CASE(cpp_socket_test_socket_set_get_option) {
+FOSSIL_TEST(cpp_socket_test_socket_set_get_option) {
     fossil::network::Socket sock;
     int rc = sock.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
@@ -107,7 +107,7 @@ FOSSIL_TEST_CASE(cpp_socket_test_socket_set_get_option) {
     sock.close();
 }
 
-FOSSIL_TEST_CASE(cpp_socket_test_socket_set_nonblocking) {
+FOSSIL_TEST(cpp_socket_test_socket_set_nonblocking) {
     fossil::network::Socket sock;
     int rc = sock.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
@@ -118,7 +118,7 @@ FOSSIL_TEST_CASE(cpp_socket_test_socket_set_nonblocking) {
     sock.close();
 }
 
-FOSSIL_TEST_CASE(cpp_socket_test_socket_is_ipv6) {
+FOSSIL_TEST(cpp_socket_test_socket_is_ipv6) {
     fossil::network::Socket sock4, sock6;
     int rc = sock4.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
@@ -130,20 +130,20 @@ FOSSIL_TEST_CASE(cpp_socket_test_socket_is_ipv6) {
     sock6.close();
 }
 
-FOSSIL_TEST_CASE(cpp_socket_test_socket_open_close) {
+FOSSIL_TEST(cpp_socket_test_socket_open_close) {
     fossil::network::Socket sock;
     int rc = sock.open("tcp", "127.0.0.1", 0);
     ASSUME_ITS_TRUE(rc == -1 || rc == 0);
     sock.close();
 }
 
-FOSSIL_TEST_CASE(cpp_socket_test_socket_resolve_hostname) {
+FOSSIL_TEST(cpp_socket_test_socket_resolve_hostname) {
     char ip[64];
     int rc = fossil::network::Socket::resolve_hostname("localhost", ip, sizeof(ip));
     ASSUME_ITS_TRUE(rc == 0);
 }
 
-FOSSIL_TEST_CASE(cpp_socket_test_socket_get_address_local) {
+FOSSIL_TEST(cpp_socket_test_socket_get_address_local) {
     fossil::network::Socket sock;
     int rc = sock.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
@@ -155,7 +155,7 @@ FOSSIL_TEST_CASE(cpp_socket_test_socket_get_address_local) {
     sock.close();
 }
 
-FOSSIL_TEST_CASE(cpp_socket_test_socket_set_timeout) {
+FOSSIL_TEST(cpp_socket_test_socket_set_timeout) {
     fossil::network::Socket sock;
     int rc = sock.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
     ASSUME_ITS_TRUE(rc == 0);
