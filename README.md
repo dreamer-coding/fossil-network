@@ -54,7 +54,7 @@ Add the `fossil-network.wrap` file in your `subprojects` directory and include t
 ```ini
 [wrap-git]
 url = https://github.com/fossillogic/fossil-network.git
-revision = v0.1.1
+revision = v0.1.2
 
 [provide]
 dependency_names = fossil-network
