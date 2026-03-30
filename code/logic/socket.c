@@ -24,6 +24,29 @@
  */
 #include "fossil/network/socket.h"
 
+#if defined(_WIN32)
+#include <winsock2.h>
+#include <windows.h>
+#include <iphlpapi.h>
+#include <process.h>
+#include <ws2tcpip.h>
+#else
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+#include <sys/select.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netdb.h> // Required for struct addrinfo and getaddrinfo
+#include <errno.h>
+#include <fcntl.h>
+#if defined(__linux__)
+#include <netpacket/packet.h>
+#endif
+#endif
+
 #include <string.h>
 #include <stdio.h>
 
