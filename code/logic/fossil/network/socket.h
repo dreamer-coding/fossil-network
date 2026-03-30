@@ -409,6 +409,7 @@ int fossil_net_socket_sleep(uint32_t ms);
 #ifdef __cplusplus
 }
 #include <string>
+#include <cstring>
 
 namespace fossil::net
 {
@@ -423,7 +424,7 @@ namespace fossil::net
          */
         Socket()
         {
-            memset(&sock_, 0, sizeof(sock_));
+            std::memset(&sock_, 0, sizeof(sock_));
         }
 
         /**
