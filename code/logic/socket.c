@@ -41,7 +41,6 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h> // Required for struct addrinfo and getaddrinfo
-#include <netpacket/packet.h>
 #include <errno.h>
 #include <fcntl.h>
 #endif
