@@ -26,6 +26,5 @@
 #define FOSSIL_NETWORK_FRAMEWORK_H
 
 #include "socket.h"
-#include "echo.h"
 
 #endif /* FOSSIL_NETWORK_FRAMEWORK_H */

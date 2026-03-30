@@ -51,136 +51,160 @@ FOSSIL_TEARDOWN(cpp_socket_fixture) {
 // as samples for library usage.
 // * * * * * * * * * * * * * * * * * * * * * * * *
 
-FOSSIL_TEST(cpp_socket_test_socket_init_cleanup) {
-    int rc = fossil::network::Socket::init();
+FOSSIL_TEST(cpp_socket_test_socket_create_types_and_families) {
+    fossil::net::Socket sock;
+    // TCP IPv4
+    int rc = sock.socket_create("fossil.net.socket.type.tcp", "fossil.net.family.ipv4");
     ASSUME_ITS_TRUE(rc == 0);
-    rc = fossil::network::Socket::cleanup();
+    sock.socket_close();
+    // TCP IPv6
+    rc = sock.socket_create("fossil.net.socket.type.tcp", "fossil.net.family.ipv6");
     ASSUME_ITS_TRUE(rc == 0);
+    sock.socket_close();
+    // UDP IPv4
+    rc = sock.socket_create("fossil.net.socket.type.udp", "fossil.net.family.ipv4");
+    ASSUME_ITS_TRUE(rc == 0);
+    sock.socket_close();
+    // UDP IPv6
+    rc = sock.socket_create("fossil.net.socket.type.udp", "fossil.net.family.ipv6");
+    ASSUME_ITS_TRUE(rc == 0);
+    sock.socket_close();
+    // RAW IPv4
+    rc = sock.socket_create("fossil.net.socket.type.raw", "fossil.net.family.ipv4");
+    // RAW sockets may require privileges, so allow failure
+    ASSUME_ITS_TRUE(rc == 0 || rc == -1);
+    if (rc == 0) sock.socket_close();
 }
 
-FOSSIL_TEST(cpp_socket_test_proto_name_conversion) {
-    fossil_protocol_t proto = fossil::network::Socket::proto_from_name("tcp");
-    ASSUME_ITS_TRUE(proto != FOSSIL_PROTO_UNKNOWN);
-    std::string name = fossil::network::Socket::proto_to_name(proto);
-    ASSUME_ITS_TRUE(!name.empty());
+FOSSIL_TEST(cpp_socket_test_socket_blocking_option) {
+    fossil::net::Socket sock;
+    int rc = sock.socket_create("fossil.net.socket.type.tcp", "fossil.net.family.ipv4");
+    ASSUME_ITS_TRUE(rc == 0);
+    rc = sock.socket_set_blocking(false);
+    ASSUME_ITS_TRUE(rc == 0);
+    rc = sock.socket_set_blocking(true);
+    ASSUME_ITS_TRUE(rc == 0);
+    sock.socket_close();
 }
 
-FOSSIL_TEST(cpp_socket_test_socket_create_close) {
-    fossil::network::Socket sock;
-    int rc = sock.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
+FOSSIL_TEST(cpp_socket_test_socket_address_parse_and_to_string) {
+    fossil_net_address_t addr;
+    int rc = fossil_net_socket_address_parse(&addr, "127.0.0.1", 8080);
     ASSUME_ITS_TRUE(rc == 0);
-    rc = sock.close();
+    char buf[128];
+    rc = fossil_net_socket_address_to_string(&addr, buf, sizeof(buf));
     ASSUME_ITS_TRUE(rc == 0);
+    ASSUME_ITS_TRUE(strstr(buf, "127.0.0.1") != NULL);
 }
 
-FOSSIL_TEST(cpp_socket_test_socket_bind_listen_close) {
-    fossil::network::Socket sock;
-    int rc = sock.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
+FOSSIL_TEST(cpp_socket_test_socket_bind_and_listen_ipv6) {
+    fossil::net::Socket sock;
+    fossil_net_address_t addr;
+    int rc = sock.socket_create("fossil.net.socket.type.tcp", "fossil.net.family.ipv6");
     ASSUME_ITS_TRUE(rc == 0);
-    rc = sock.bind("127.0.0.1", 0); // bind to any port
+    rc = fossil_net_socket_address_parse(&addr, "::1", 0);
     ASSUME_ITS_TRUE(rc == 0);
-    rc = sock.listen(1);
+    rc = sock.socket_bind(&addr);
     ASSUME_ITS_TRUE(rc == 0);
-    rc = sock.close();
+    rc = sock.socket_listen(1);
     ASSUME_ITS_TRUE(rc == 0);
+    sock.socket_close();
 }
 
-FOSSIL_TEST(cpp_socket_test_proto_from_name_unknown) {
-    fossil_protocol_t proto = fossil::network::Socket::proto_from_name("notarealproto");
-    ASSUME_ITS_TRUE(proto == FOSSIL_PROTO_UNKNOWN);
+FOSSIL_TEST(cpp_socket_test_socket_send_receive_loopback) {
+    fossil::net::Socket server, client, peer;
+    fossil_net_address_t addr, peer_addr;
+    int rc = server.socket_create("fossil.net.socket.type.tcp", "fossil.net.family.ipv4");
+    ASSUME_ITS_TRUE(rc == 0);
+    rc = fossil_net_socket_address_parse(&addr, "127.0.0.1", 0);
+    ASSUME_ITS_TRUE(rc == 0);
+    rc = server.socket_bind(&addr);
+    ASSUME_ITS_TRUE(rc == 0);
+    rc = server.socket_listen(1);
+    ASSUME_ITS_TRUE(rc == 0);
+
+    // Get the port assigned
+    struct sockaddr_in sin;
+    socklen_t len = sizeof(sin);
+    getsockname((int)(intptr_t)server.native_handle()->handle, (struct sockaddr *)&sin, &len);
+    uint16_t port = ntohs(sin.sin_port);
+
+    // Connect client
+    rc = client.socket_create("fossil.net.socket.type.tcp", "fossil.net.family.ipv4");
+    ASSUME_ITS_TRUE(rc == 0);
+    fossil_net_address_t connect_addr;
+    fossil_net_socket_address_parse(&connect_addr, "127.0.0.1", port);
+    rc = client.socket_connect(&connect_addr);
+    ASSUME_ITS_TRUE(rc == 0);
+
+    // Accept on server
+    rc = server.socket_accept(peer, &peer_addr);
+    ASSUME_ITS_TRUE(rc == 0);
+
+    // Send/receive
+    const char *msg = "hello";
+    uint32_t sent = 0, recvd = 0;
+    rc = client.socket_send(msg, 5, &sent);
+    ASSUME_ITS_TRUE(rc == 0 && sent == 5);
+    char buf[16] = {0};
+    rc = peer.socket_receive(buf, sizeof(buf), &recvd);
+    ASSUME_ITS_TRUE(rc == 0 && recvd == 5);
+    ASSUME_ITS_TRUE(strncmp(buf, "hello", 5) == 0);
+
+    peer.socket_close();
+    client.socket_close();
+    server.socket_close();
 }
 
-FOSSIL_TEST(cpp_socket_test_proto_to_name_unknown) {
-    std::string name = fossil::network::Socket::proto_to_name(FOSSIL_PROTO_UNKNOWN);
-    ASSUME_ITS_TRUE(name == "unknown");
+FOSSIL_TEST(cpp_socket_test_socket_macpp_get_and_to_string) {
+    fossil_net_macpp_t mac;
+    int rc = fossil_net_socket_macpp_get(&mac);
+    ASSUME_ITS_TRUE(rc == 0);
+    char buf[32];
+    rc = fossil_net_socket_macpp_to_string(&mac, buf, sizeof(buf));
+    ASSUME_ITS_TRUE(rc == 0);
+    ASSUME_ITS_TRUE(strlen(buf) >= 11); // "AA:BB:CC:DD:EE:FF"
 }
 
-FOSSIL_TEST(cpp_socket_test_socket_set_get_option) {
-    fossil::network::Socket sock;
-    int rc = sock.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
+FOSSIL_TEST(cpp_socket_test_socket_resolve_and_hostname) {
+    fossil_net_address_t addr;
+    int rc = fossil_net_socket_resolve("localhost", &addr);
     ASSUME_ITS_TRUE(rc == 0);
-    rc = sock.set_option(SOL_SOCKET, SO_REUSEADDR, 1);
+    char hostname[128];
+    rc = fossil_net_socket_hostname(hostname, sizeof(hostname));
     ASSUME_ITS_TRUE(rc == 0);
-    int value = 0;
-    rc = sock.get_option(SOL_SOCKET, SO_REUSEADDR, &value);
-    ASSUME_ITS_TRUE(rc == 0);
-    sock.close();
+    ASSUME_ITS_TRUE(strlen(hostname) > 0);
 }
 
-FOSSIL_TEST(cpp_socket_test_socket_set_nonblocking) {
-    fossil::network::Socket sock;
-    int rc = sock.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
+FOSSIL_TEST(cpp_socket_test_socket_poll_timeout) {
+    fossil::net::Socket sock;
+    int rc = sock.socket_create("fossil.net.socket.type.tcp", "fossil.net.family.ipv4");
     ASSUME_ITS_TRUE(rc == 0);
-    rc = sock.set_nonblocking(1);
-    ASSUME_ITS_TRUE(rc == 0);
-    rc = sock.set_nonblocking(0);
-    ASSUME_ITS_TRUE(rc == 0);
-    sock.close();
+    fossil_net_socket_t *socks[1] = { sock.native_handle() };
+    int ready = fossil_net_socket_poll(socks, 1, 100);
+    ASSUME_ITS_TRUE(ready == 0 || ready == -1);
+    sock.socket_close();
 }
 
-FOSSIL_TEST(cpp_socket_test_socket_is_ipv6) {
-    fossil::network::Socket sock4, sock6;
-    int rc = sock4.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
-    ASSUME_ITS_TRUE(rc == 0);
-    rc = sock6.create(AF_INET6, fossil::network::Socket::proto_from_name("tcp"));
-    ASSUME_ITS_TRUE(rc == 0);
-    ASSUME_ITS_TRUE(sock4.is_ipv6() == 0);
-    ASSUME_ITS_TRUE(sock6.is_ipv6() == 1);
-    sock4.close();
-    sock6.close();
-}
-
-FOSSIL_TEST(cpp_socket_test_socket_open_close) {
-    fossil::network::Socket sock;
-    int rc = sock.open("tcp", "127.0.0.1", 0);
-    ASSUME_ITS_TRUE(rc == -1 || rc == 0);
-    sock.close();
-}
-
-FOSSIL_TEST(cpp_socket_test_socket_resolve_hostname) {
-    char ip[64];
-    int rc = fossil::network::Socket::resolve_hostname("localhost", ip, sizeof(ip));
-    ASSUME_ITS_TRUE(rc == 0);
-}
-
-FOSSIL_TEST(cpp_socket_test_socket_get_address_local) {
-    fossil::network::Socket sock;
-    int rc = sock.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
-    ASSUME_ITS_TRUE(rc == 0);
-    rc = sock.bind("127.0.0.1", 0);
-    ASSUME_ITS_TRUE(rc == 0);
-    char addr[64];
-    rc = sock.get_address(addr, sizeof(addr), 0);
-    ASSUME_ITS_TRUE(rc == 0);
-    sock.close();
-}
-
-FOSSIL_TEST(cpp_socket_test_socket_set_timeout) {
-    fossil::network::Socket sock;
-    int rc = sock.create(AF_INET, fossil::network::Socket::proto_from_name("tcp"));
-    ASSUME_ITS_TRUE(rc == 0);
-    rc = sock.set_timeout(100, 100);
-    ASSUME_ITS_TRUE(rc == 0);
-    sock.close();
+FOSSIL_TEST(cpp_socket_test_socket_error_string) {
+    int err = fossil_net_socket_error_last();
+    const char *msg = fossil_net_socket_error_string(err);
+    ASSUME_ITS_TRUE(msg != NULL);
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * *
 // * Fossil Logic Test Pool
 // * * * * * * * * * * * * * * * * * * * * * * * *
 FOSSIL_TEST_GROUP(cpp_socket_tests) {
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_init_cleanup);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_proto_name_conversion);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_create_close);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_bind_listen_close);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_proto_from_name_unknown);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_proto_to_name_unknown);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_set_get_option);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_set_nonblocking);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_is_ipv6);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_open_close);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_resolve_hostname);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_get_address_local);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_set_timeout);
+    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_create_types_and_families);
+    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_blocking_option);
+    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_address_parse_and_to_string);
+    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_bind_and_listen_ipv6);
+    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_send_receive_loopback);
+    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_macpp_get_and_to_string);
+    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_resolve_and_hostname);
+    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_poll_timeout);
+    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_error_string);
 
     FOSSIL_TEST_REGISTER(cpp_socket_fixture);
 } // end of tests
