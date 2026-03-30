@@ -24,6 +24,10 @@
  */
 #include "fossil/network/framework.h"
 #include <fossil/pizza/framework.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <cstring>
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * *
@@ -157,11 +161,11 @@ FOSSIL_TEST(cpp_socket_test_socket_send_receive_loopback) {
 }
 
 FOSSIL_TEST(cpp_socket_test_socket_macpp_get_and_to_string) {
-    fossil_net_macpp_t mac;
-    int rc = fossil_net_socket_macpp_get(&mac);
+    fossil_net_mac_t mac;
+    int rc = fossil_net_socket_mac_get(&mac);
     ASSUME_ITS_TRUE(rc == 0);
     char buf[32];
-    rc = fossil_net_socket_macpp_to_string(&mac, buf, sizeof(buf));
+    rc = fossil_net_socket_mac_to_string(&mac, buf, sizeof(buf));
     ASSUME_ITS_TRUE(rc == 0);
     ASSUME_ITS_TRUE(strlen(buf) >= 11); // "AA:BB:CC:DD:EE:FF"
 }
