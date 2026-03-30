@@ -30,7 +30,6 @@
 #include <iphlpapi.h>
 #include <process.h>
 #include <ws2tcpip.h>
-#include <netdb.h> // Required for struct addrinfo and getaddrinfo on Windows
 #else
 #include <ifaddrs.h>
 #include <net/if.h>
