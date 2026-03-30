@@ -43,6 +43,9 @@
 #include <netdb.h> // Required for struct addrinfo and getaddrinfo
 #include <errno.h>
 #include <fcntl.h>
+#if defined(__linux__)
+#include <netpacket/packet.h>
+#endif
 #endif
 
 #include <string.h>
@@ -299,6 +302,7 @@ int fossil_net_socket_mac_get(fossil_net_mac_t *mac) {
         mac->bytes[0],mac->bytes[1],mac->bytes[2],mac->bytes[3],mac->bytes[4],mac->bytes[5]);
     free(adapters);
 #else
+#if defined(__linux__)
     struct ifaddrs *ifap, *ifa;
     if (getifaddrs(&ifap) != 0) return -1;
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
@@ -312,6 +316,11 @@ int fossil_net_socket_mac_get(fossil_net_mac_t *mac) {
         }
     }
     freeifaddrs(ifap);
+    return 0;
+#else
+    // Not supported on this platform
+    return -1;
+#endif
 #endif
     return 0;
 }
