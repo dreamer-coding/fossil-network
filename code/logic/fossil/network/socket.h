@@ -25,6 +25,13 @@
 #ifndef FOSSIL_NETWORK_SOCKET_H
 #define FOSSIL_NETWORK_SOCKET_H
 
+#if defined(__APPLE__)
+// Must define this **before including any headers** to get getloadavg
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE
+#endif
+#endif
+
 #if defined(_WIN32)
 #include <winsock2.h>
 #include <windows.h>
