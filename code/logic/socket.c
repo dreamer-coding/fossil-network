@@ -36,7 +36,6 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
-#include <pthread.h>
 #include <sys/select.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -281,41 +280,6 @@ int fossil_net_socket_sleep(uint32_t ms) {
 #else
     sleep(ms*1000);
 #endif
-    return 0;
-}
-
-/*=============================================================================
-THREADING
-=============================================================================*/
-
-#if defined(_WIN32)
-static unsigned __stdcall fossil_net_thread_func(void *arg) {
-    fossil_net_socket_thread_fn fn = ((fossil_net_socket_thread_t*)arg)->handle;
-    fn(((fossil_net_socket_thread_t*)arg)->handle);
-    return 0;
-}
-#endif
-
-int fossil_net_socket_thread_start(fossil_net_socket_thread_t *thread, fossil_net_socket_thread_fn fn, void *arg) {
-    if (!thread || !fn) return -1;
-#if defined(_WIN32)
-    thread->handle = (void*)_beginthreadex(NULL, 0, (unsigned(__stdcall*)(void*))fn, arg, 0, NULL);
-#else
-    if (pthread_create((pthread_t*)&thread->handle, NULL, (void*(*)(void*))fn, arg) != 0)
-        return -1;
-#endif
-    return 0;
-}
-
-int fossil_net_socket_thread_join(fossil_net_socket_thread_t *thread) {
-    if (!thread) return -1;
-#if defined(_WIN32)
-    WaitForSingleObject(thread->handle, INFINITE);
-    CloseHandle(thread->handle);
-#else
-    pthread_join((pthread_t)thread->handle, NULL);
-#endif
-    thread->handle = NULL;
     return 0;
 }
 

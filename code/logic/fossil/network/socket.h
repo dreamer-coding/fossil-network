@@ -351,36 +351,6 @@ int fossil_net_socket_mac_to_string(
     uint32_t size);
 
 /*=============================================================================
-THREADING
-=============================================================================*/
-
-/**
- * @brief Start a new thread for socket operations.
- *
- * Launches a new thread running the specified function with the given argument.
- *
- * @param thread Pointer to thread structure to initialize.
- * @param fn     Function pointer to thread entry point.
- * @param arg    Argument to pass to thread function.
- * @return 0 on success, non-zero on failure.
- */
-int fossil_net_socket_thread_start(
-    fossil_net_socket_thread_t *thread,
-    fossil_net_socket_thread_fn fn,
-    void *arg);
-
-/**
- * @brief Wait for a thread to finish execution.
- *
- * Joins the specified thread, blocking until it completes.
- *
- * @param thread Pointer to thread structure.
- * @return 0 on success, non-zero on failure.
- */
-int fossil_net_socket_thread_join(
-    fossil_net_socket_thread_t *thread);
-
-/*=============================================================================
 POLLING / MULTIPLEXING
 =============================================================================*/
 
