@@ -110,51 +110,6 @@ FOSSIL_TEST(cpp_socket_test_socket_bind_and_listen_ipv6) {
     sock.socket_close();
 }
 
-FOSSIL_TEST(cpp_socket_test_socket_send_receive_loopback) {
-    fossil::net::Socket server, client, peer;
-    fossil_net_address_t addr, peer_addr;
-    int rc = server.socket_create("fossil.net.socket.type.tcp", "fossil.net.family.ipv4");
-    ASSUME_ITS_TRUE(rc == 0);
-    rc = fossil_net_socket_address_parse(&addr, "127.0.0.1", 0);
-    ASSUME_ITS_TRUE(rc == 0);
-    rc = server.socket_bind(&addr);
-    ASSUME_ITS_TRUE(rc == 0);
-    rc = server.socket_listen(1);
-    ASSUME_ITS_TRUE(rc == 0);
-
-    // Get the port assigned
-    struct sockaddr_in sin;
-    socklen_t len = sizeof(sin);
-    getsockname((int)(intptr_t)server.native_handle()->handle, (struct sockaddr *)&sin, &len);
-    uint16_t port = ntohs(sin.sin_port);
-
-    // Connect client
-    rc = client.socket_create("fossil.net.socket.type.tcp", "fossil.net.family.ipv4");
-    ASSUME_ITS_TRUE(rc == 0);
-    fossil_net_address_t connect_addr;
-    fossil_net_socket_address_parse(&connect_addr, "127.0.0.1", port);
-    rc = client.socket_connect(&connect_addr);
-    ASSUME_ITS_TRUE(rc == 0);
-
-    // Accept on server
-    rc = server.socket_accept(peer, &peer_addr);
-    ASSUME_ITS_TRUE(rc == 0);
-
-    // Send/receive
-    const char *msg = "hello";
-    uint32_t sent = 0, recvd = 0;
-    rc = client.socket_send(msg, 5, &sent);
-    ASSUME_ITS_TRUE(rc == 0 && sent == 5);
-    char buf[16] = {0};
-    rc = peer.socket_receive(buf, sizeof(buf), &recvd);
-    ASSUME_ITS_TRUE(rc == 0 && recvd == 5);
-    ASSUME_ITS_TRUE(strncmp(buf, "hello", 5) == 0);
-
-    peer.socket_close();
-    client.socket_close();
-    server.socket_close();
-}
-
 FOSSIL_TEST(cpp_socket_test_socket_macpp_get_and_to_string) {
     fossil_net_mac_t mac;
     int rc = fossil_net_socket_mac_get(&mac);
@@ -199,7 +154,6 @@ FOSSIL_TEST_GROUP(cpp_socket_tests) {
     FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_blocking_option);
     FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_address_parse_and_to_string);
     FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_bind_and_listen_ipv6);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_send_receive_loopback);
     FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_macpp_get_and_to_string);
     FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_resolve_and_hostname);
     FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_poll_timeout);

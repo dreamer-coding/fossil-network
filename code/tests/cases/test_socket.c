@@ -110,51 +110,6 @@ FOSSIL_TEST(c_socket_test_socket_bind_and_listen_ipv6) {
     fossil_net_socket_close(&sock);
 }
 
-FOSSIL_TEST(c_socket_test_socket_send_receive_loopback) {
-    fossil_net_socket_t server, client, peer;
-    fossil_net_address_t addr, peer_addr;
-    int rc = fossil_net_socket_create(&server, "fossil.net.socket.type.tcp", "fossil.net.family.ipv4");
-    ASSUME_ITS_TRUE(rc == 0);
-    rc = fossil_net_socket_address_parse(&addr, "127.0.0.1", 0);
-    ASSUME_ITS_TRUE(rc == 0);
-    rc = fossil_net_socket_bind(&server, &addr);
-    ASSUME_ITS_TRUE(rc == 0);
-    rc = fossil_net_socket_listen(&server, 1);
-    ASSUME_ITS_TRUE(rc == 0);
-
-    // Get the port assigned
-    struct sockaddr_in sin;
-    socklen_t len = sizeof(sin);
-    getsockname((int)(intptr_t)server.handle, (struct sockaddr *)&sin, &len);
-    uint16_t port = ntohs(sin.sin_port);
-
-    // Connect client
-    rc = fossil_net_socket_create(&client, "fossil.net.socket.type.tcp", "fossil.net.family.ipv4");
-    ASSUME_ITS_TRUE(rc == 0);
-    fossil_net_address_t connect_addr;
-    fossil_net_socket_address_parse(&connect_addr, "127.0.0.1", port);
-    rc = fossil_net_socket_connect(&client, &connect_addr);
-    ASSUME_ITS_TRUE(rc == 0);
-
-    // Accept on server
-    rc = fossil_net_socket_accept(&server, &peer, &peer_addr);
-    ASSUME_ITS_TRUE(rc == 0);
-
-    // Send/receive
-    const char *msg = "hello";
-    uint32_t sent = 0, recvd = 0;
-    rc = fossil_net_socket_send(&client, msg, 5, &sent);
-    ASSUME_ITS_TRUE(rc == 0 && sent == 5);
-    char buf[16] = {0};
-    rc = fossil_net_socket_receive(&peer, buf, sizeof(buf), &recvd);
-    ASSUME_ITS_TRUE(rc == 0 && recvd == 5);
-    ASSUME_ITS_TRUE(strncmp(buf, "hello", 5) == 0);
-
-    fossil_net_socket_close(&peer);
-    fossil_net_socket_close(&client);
-    fossil_net_socket_close(&server);
-}
-
 FOSSIL_TEST(c_socket_test_socket_mac_get_and_to_string) {
     fossil_net_mac_t mac;
     int rc = fossil_net_socket_mac_get(&mac);

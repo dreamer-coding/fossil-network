@@ -25,38 +25,6 @@
 #ifndef FOSSIL_NETWORK_SOCKET_H
 #define FOSSIL_NETWORK_SOCKET_H
 
-#if defined(__APPLE__)
-// Must define this **before including any headers** to get getloadavg
-#ifndef _DARWIN_C_SOURCE
-#define _DARWIN_C_SOURCE
-#endif
-#endif
-
-#if defined(_WIN32)
-#include <winsock2.h>
-#include <windows.h>
-#include <iphlpapi.h>
-#include <process.h>
-#include <ws2tcpip.h>
-#else
-#include <ifaddrs.h>
-#include <net/if.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
-#include <sys/select.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-
-#include <arpa/inet.h>
-#include <netdb.h> // Required for struct addrinfo and getaddrinfo
-#include <errno.h>
-#include <fcntl.h>
-#if defined(__linux__)
-#include <netpacket/packet.h>
-#endif
-#endif
-
 #include <stdint.h>
 #include <stdbool.h>
 
