@@ -2,8 +2,6 @@ cc = meson.get_compiler('c')
 add_project_arguments('-D_POSIX_C_SOURCE=200112L', language: 'c')
 add_project_arguments('-D_POSIX_C_SOURCE=200112L', language: 'cpp')
 
-libm_dep = cc.find_library('m', required: false)
-
 # ------------------------------
 # Platform-specific dependencies
 # ------------------------------
@@ -19,13 +17,13 @@ endif
 
 if host_machine.system() == 'darwin'
     platform_deps += [
-        dependency('appleframeworks', modules: ['IOKit', 'CoreGraphics', 'Foundation'])
+        dependency('appleframeworks', modules: ['IOKit', 'Foundation'])
     ]
 endif
 
 # Linux has no extra libraries (keep empty)
 if host_machine.system() == 'linux'
-    platform_deps += []
+    platform_deps += [
+        cc.find_library('m', required: false)
+    ]
 endif
-
-platform_deps += libm_dep
