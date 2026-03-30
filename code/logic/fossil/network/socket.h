@@ -25,826 +25,546 @@
 #ifndef FOSSIL_NETWORK_SOCKET_H
 #define FOSSIL_NETWORK_SOCKET_H
 
-#include <stddef.h>
 #include <stdint.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <ctype.h>
-#include <errno.h>
-#include <ctype.h>
-#include <time.h>
-
-// --- Portable type definitions for macOS / BSD headers ---
-#if defined(__APPLE__) || defined(__FreeBSD__)
-#include <sys/cdefs.h>
-#ifndef _U_INT_DEFINED
-typedef unsigned int   u_int;
-typedef unsigned char  u_char;
-typedef unsigned short u_short;
-#define _U_INT_DEFINED
-#endif
-#endif
-
-#ifdef _WIN32
-    #ifndef WIN32_LEAN_AND_MEAN
-    #define WIN32_LEAN_AND_MEAN
-    #endif
-    #ifndef NOMINMAX
-    #define NOMINMAX
-    #endif
-
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #include <bcrypt.h>
-    #include <iphlpapi.h>
-    #include <windows.h>
-
-    typedef SOCKET fossil_socket_fd_t;
-
-    // ssize_t is POSIX; Windows lacks it
-    #if defined(_MSC_VER)
-        #include <BaseTsd.h>
-        typedef SSIZE_T ssize_t;
-    #elif defined(__MINGW32__)
-        #ifndef _SSIZE_T_DEFINED
-            typedef long ssize_t;
-            #define _SSIZE_T_DEFINED
-        #endif
-    #endif
-
-#else
-    // POSIX / Unix-like
-    #include <sys/types.h>
-    #include <sys/socket.h>
-    #include <sys/time.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <netdb.h>
-    #include <unistd.h>
-    #include <fcntl.h>
-    #include <poll.h>
-
-    typedef int fossil_socket_fd_t;
-
-#endif
+#include <stdbool.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-// *****************************************************************************
-// Function prototypes
-// *****************************************************************************
+/*=============================================================================
+STRING IDS
+=============================================================================*/
 
-// ------------------------------
-// Protocol enumeration
-// ------------------------------
-typedef enum {
-    FOSSIL_PROTO_UNKNOWN = 0,
-    FOSSIL_PROTO_TCP,
-    FOSSIL_PROTO_UDP,
-    FOSSIL_PROTO_RAW,
-    FOSSIL_PROTO_ICMP,
-    FOSSIL_PROTO_SCTP,
-    FOSSIL_PROTO_HTTP,
-    FOSSIL_PROTO_HTTPS,
-    FOSSIL_PROTO_FTP,
-    FOSSIL_PROTO_SSH,
-    FOSSIL_PROTO_DNS,
-    FOSSIL_PROTO_NTP,
-    FOSSIL_PROTO_SMTP,
-    FOSSIL_PROTO_POP3,
-    FOSSIL_PROTO_IMAP,
-    FOSSIL_PROTO_LDAP,
-    FOSSIL_PROTO_MQTT
-} fossil_protocol_t;
+/*
+Socket Types:
+    fossil.net.socket.type.tcp
+    fossil.net.socket.type.udp
+    fossil.net.socket.type.raw
 
-// ------------------------------
-// Socket structure
-// ------------------------------
-typedef struct fossil_network_socket_t {
-    fossil_socket_fd_t fd;
-    int family;
-    int type;
-    fossil_protocol_t proto;
-} fossil_network_socket_t;
+Address Families:
+    fossil.net.family.ipv4
+    fossil.net.family.ipv6
 
-// ------------------------------
-// Poll structure
-// ------------------------------
-typedef struct {
-    fossil_network_socket_t *sock;
-    int events;   /**< Bitmask: 1=readable, 2=writeable, 4=error */
-    int revents;  /**< Output mask after polling */
-} fossil_network_pollfd_t;
+Socket Options:
+    fossil.net.socket.blocking
+    fossil.net.socket.reuseaddr
+*/
 
-// ------------------------------
+/*=============================================================================
+CORE STRUCTURES
+=============================================================================*/
+
+typedef struct fossil_net_socket
+{
+    void *handle;    /* OS-specific socket */
+    char id[64];     /* user-defined ID */
+    char type[32];   /* socket type string ID */
+    char family[32]; /* address family string ID */
+    bool blocking;
+} fossil_net_socket_t;
+
+typedef struct fossil_net_address
+{
+    char ip[64]; /* IPv4 or IPv6 string */
+    uint16_t port;
+    char family[32];
+} fossil_net_address_t;
+
+typedef struct fossil_net_mac
+{
+    uint8_t bytes[6];
+    char string[18]; /* AA:BB:CC:DD:EE:FF */
+} fossil_net_mac_t;
+
+/*=============================================================================
+LIFECYCLE
+=============================================================================*/
+
 /**
- * @brief Initialize the network socket subsystem (Windows only).
+ * @brief Initialize the networking subsystem.
  *
- * This function must be called before using any socket operations on Windows.
- * On other platforms, it is a no-op.
+ * This function must be called before any other socket operations.
+ * On Windows, it initializes Winsock; on POSIX, it is a no-op.
  *
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_init(void);
+int fossil_net_socket_init(void);
 
 /**
- * @brief Cleanup the network socket subsystem (Windows only).
+ * @brief Shutdown the networking subsystem.
  *
- * This function should be called to release resources allocated by the socket
- * subsystem on Windows. On other platforms, it is a no-op.
+ * Cleans up resources allocated by the networking subsystem.
+ * On Windows, it calls WSACleanup; on POSIX, it is a no-op.
  *
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_cleanup(void);
+int fossil_net_socket_shutdown(void);
 
-// ------------------------------
-/**
- * @brief Convert a protocol name string to a fossil_protocol_t value.
- *
- * @param name The protocol name (e.g., "tcp", "udp").
- * @return The corresponding fossil_protocol_t value, or FOSSIL_PROTO_UNKNOWN if not found.
- */
-fossil_protocol_t fossil_network_socket_proto_from_name(const char *name);
+/*=============================================================================
+SOCKET MANAGEMENT
+=============================================================================*/
 
 /**
- * @brief Convert a fossil_protocol_t value to its protocol name string.
+ * @brief Create a new socket.
  *
- * @param proto The protocol enumeration value.
- * @return The protocol name string, or "unknown" if not recognized.
- */
-const char *fossil_network_socket_proto_to_name(fossil_protocol_t proto);
-
-// ------------------------------
-/**
- * @brief Create a new network socket.
+ * Initializes a socket structure with the specified type and address family.
+ * Supported types: "fossil.net.socket.type.tcp", "fossil.net.socket.type.udp", "fossil.net.socket.type.raw".
+ * Supported families: "fossil.net.family.ipv4", "fossil.net.family.ipv6".
  *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param family Address family (e.g., AF_INET, AF_INET6).
- * @param proto Protocol type (see fossil_protocol_t).
+ * @param sock   Pointer to socket structure to initialize.
+ * @param type   Socket type string ID.
+ * @param family Address family string ID.
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_create(fossil_network_socket_t *sock,
-                                 int family, fossil_protocol_t proto);
+int fossil_net_socket_create(
+    fossil_net_socket_t *sock,
+    const char *type,
+    const char *family);
+
+/**
+ * @brief Close a socket and release its resources.
+ *
+ * Closes the underlying OS socket handle and resets the structure.
+ *
+ * @param sock Pointer to socket structure.
+ * @return 0 on success, non-zero on failure.
+ */
+int fossil_net_socket_close(
+    fossil_net_socket_t *sock);
+
+/**
+ * @brief Set socket blocking or non-blocking mode.
+ *
+ * Configures the socket to operate in blocking or non-blocking mode.
+ *
+ * @param sock     Pointer to socket structure.
+ * @param blocking true for blocking, false for non-blocking.
+ * @return 0 on success, non-zero on failure.
+ */
+int fossil_net_socket_set_blocking(
+    fossil_net_socket_t *sock,
+    bool blocking);
+
+/*=============================================================================
+CONNECTION
+=============================================================================*/
 
 /**
  * @brief Bind a socket to a local address and port.
  *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param address Local address to bind to (e.g., "127.0.0.1").
- * @param port Local port number.
+ * Associates the socket with a specific local IP address and port.
+ *
+ * @param sock Pointer to socket structure.
+ * @param addr Pointer to address structure.
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_bind(fossil_network_socket_t *sock,
-                               const char *address, uint16_t port);
+int fossil_net_socket_bind(
+    fossil_net_socket_t *sock,
+    const fossil_net_address_t *addr);
 
 /**
- * @brief Set a socket to listen for incoming connections.
+ * @brief Listen for incoming connections on a socket.
  *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param backlog Maximum number of pending connections.
+ * Marks the socket as a passive socket to accept incoming connection requests.
+ *
+ * @param sock    Pointer to socket structure.
+ * @param backlog Maximum length of the pending connections queue.
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_listen(fossil_network_socket_t *sock, int backlog);
+int fossil_net_socket_listen(
+    fossil_net_socket_t *sock,
+    int backlog);
 
 /**
  * @brief Accept an incoming connection on a listening socket.
  *
- * @param server Pointer to the listening fossil_network_socket_t structure.
- * @param client Pointer to a fossil_network_socket_t structure for the new connection.
+ * Accepts a new connection and initializes a client socket structure.
+ * Optionally fills in the address of the connecting peer.
+ *
+ * @param server Pointer to listening socket structure.
+ * @param client Pointer to client socket structure to initialize.
+ * @param addr   Pointer to address structure to receive peer info (optional).
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_accept(fossil_network_socket_t *server,
-                                 fossil_network_socket_t *client);
+int fossil_net_socket_accept(
+    fossil_net_socket_t *server,
+    fossil_net_socket_t *client,
+    fossil_net_address_t *addr);
 
 /**
- * @brief Connect a socket to a remote address and port.
+ * @brief Connect a socket to a remote address.
  *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param address Remote address to connect to.
- * @param port Remote port number.
+ * Initiates a connection to the specified remote IP address and port.
+ *
+ * @param sock Pointer to socket structure.
+ * @param addr Pointer to remote address structure.
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_connect(fossil_network_socket_t *sock,
-                                  const char *address, uint16_t port);
+int fossil_net_socket_connect(
+    fossil_net_socket_t *sock,
+    const fossil_net_address_t *addr);
+
+/*=============================================================================
+DATA TRANSFER
+=============================================================================*/
 
 /**
- * @brief Close a network socket and release its resources.
+ * @brief Send data through a socket.
  *
- * @param sock Pointer to a fossil_network_socket_t structure.
+ * Sends a buffer of data over the socket. The number of bytes actually sent is returned.
+ *
+ * @param sock  Pointer to socket structure.
+ * @param data  Pointer to data buffer to send.
+ * @param size  Size of data buffer in bytes.
+ * @param sent  Pointer to variable to receive number of bytes sent.
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_close(fossil_network_socket_t *sock);
+int fossil_net_socket_send(
+    fossil_net_socket_t *sock,
+    const void *data,
+    uint32_t size,
+    uint32_t *sent);
 
-// ------------------------------
 /**
- * @brief Send data through a network socket.
+ * @brief Receive data from a socket.
  *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param buffer Pointer to the data buffer to send.
- * @param length Number of bytes to send.
- * @return Number of bytes sent, or -1 on error.
+ * Receives data from the socket into the provided buffer. The number of bytes received is returned.
+ *
+ * @param sock     Pointer to socket structure.
+ * @param buffer   Pointer to buffer to receive data.
+ * @param size     Size of buffer in bytes.
+ * @param received Pointer to variable to receive number of bytes received.
+ * @return 0 on success, non-zero on failure.
  */
-ssize_t fossil_network_socket_send(fossil_network_socket_t *sock,
-                                   const void *buffer, size_t length);
+int fossil_net_socket_receive(
+    fossil_net_socket_t *sock,
+    void *buffer,
+    uint32_t size,
+    uint32_t *received);
+
+/*=============================================================================
+ADDRESS UTILITIES
+=============================================================================*/
 
 /**
- * @brief Receive data from a network socket.
+ * @brief Parse an IP address and port into an address structure.
  *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param buffer Pointer to the buffer to receive data into.
- * @param length Maximum number of bytes to receive.
- * @return Number of bytes received, or -1 on error.
- */
-ssize_t fossil_network_socket_recv(fossil_network_socket_t *sock,
-                                   void *buffer, size_t length);
-
-// ------------------------------
-/**
- * @brief Open and optionally connect or bind a socket using protocol name and address.
+ * Converts a string IP and port number into a fossil_net_address_t structure.
  *
- * This convenience function creates a socket, sets its protocol, and binds or connects
- * it to the specified address and port as appropriate.
- *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param proto_name Protocol name string (e.g., "tcp", "udp").
- * @param address Address to bind or connect to.
+ * @param addr Pointer to address structure to fill.
+ * @param ip   String representation of IP address.
  * @param port Port number.
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_open(fossil_network_socket_t *sock,
-                               const char *proto_name,
-                               const char *address, uint16_t port);
+int fossil_net_socket_address_parse(
+    fossil_net_address_t *addr,
+    const char *ip,
+    uint16_t port);
 
 /**
- * @brief Set an integer socket option.
+ * @brief Convert an address structure to a string.
  *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param level Protocol level (e.g., SOL_SOCKET, IPPROTO_TCP).
- * @param option Option name (e.g., SO_REUSEADDR).
- * @param value Integer value to set.
+ * Formats the address as a string (e.g., "127.0.0.1:8080").
+ *
+ * @param addr   Pointer to address structure.
+ * @param buffer Output buffer for string.
+ * @param size   Size of output buffer.
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_set_option(fossil_network_socket_t *sock,
-                                     int level, int option, int value);
+int fossil_net_socket_address_to_string(
+    const fossil_net_address_t *addr,
+    char *buffer,
+    uint32_t size);
 
-/**
- * @brief Get an integer socket option.
- *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param level Protocol level (e.g., SOL_SOCKET, IPPROTO_TCP).
- * @param option Option name (e.g., SO_ERROR).
- * @param value Output pointer for the integer value.
- * @return 0 on success, non-zero on failure.
- */
-int fossil_network_socket_get_option(fossil_network_socket_t *sock,
-                                     int level, int option, int *value);
-
-/**
- * @brief Set the socket to blocking or non-blocking mode.
- *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param nonblock 1 to enable non-blocking, 0 to disable.
- * @return 0 on success, non-zero on failure.
- */
-int fossil_network_socket_set_nonblocking(fossil_network_socket_t *sock,
-                                          int nonblock);
+/*=============================================================================
+DNS / HOST
+=============================================================================*/
 
 /**
  * @brief Resolve a hostname to an IP address.
  *
- * @param hostname The hostname (e.g., "example.com").
- * @param ip_buffer Buffer to store the resulting IP address string.
- * @param ip_buffer_len Length of ip_buffer.
+ * Looks up the IP address for the given hostname and fills the address structure.
+ *
+ * @param hostname Hostname to resolve.
+ * @param out_addr Pointer to address structure to fill.
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_resolve_hostname(const char *hostname,
-                                           char *ip_buffer,
-                                           size_t ip_buffer_len);
+int fossil_net_socket_resolve(
+    const char *hostname,
+    fossil_net_address_t *out_addr);
 
 /**
- * @brief Get the local or remote address of a socket.
+ * @brief Get the local machine's hostname.
  *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param buffer Buffer to store the address string.
- * @param buffer_len Length of buffer.
- * @param remote 1 for remote address, 0 for local address.
+ * Retrieves the system's hostname into the provided buffer.
+ *
+ * @param buffer Output buffer for hostname.
+ * @param size   Size of output buffer.
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_get_address(fossil_network_socket_t *sock,
-                                      char *buffer, size_t buffer_len,
-                                      int remote);
+int fossil_net_socket_hostname(
+    char *buffer,
+    uint32_t size);
+
+/*=============================================================================
+MAC ADDRESS
+=============================================================================*/
 
 /**
- * @brief Get the last socket error code.
+ * @brief Get the primary MAC address of the system.
  *
- * @return Platform-specific error code.
+ * Retrieves the hardware MAC address of the primary network interface.
+ *
+ * @param mac Pointer to MAC address structure to fill.
+ * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_last_error(void);
+int fossil_net_socket_mac_get(
+    fossil_net_mac_t *mac);
 
 /**
- * @brief Convert a socket error code to a human-readable string.
+ * @brief Convert a MAC address structure to a string.
  *
- * @param err Error code.
- * @return Constant string description of the error.
+ * Formats the MAC address as a string (e.g., "AA:BB:CC:DD:EE:FF").
+ *
+ * @param mac    Pointer to MAC address structure.
+ * @param buffer Output buffer for string.
+ * @param size   Size of output buffer.
+ * @return 0 on success, non-zero on failure.
  */
-const char *fossil_network_socket_error_string(int err);
+int fossil_net_socket_mac_to_string(
+    const fossil_net_mac_t *mac,
+    char *buffer,
+    uint32_t size);
+
+/*=============================================================================
+POLLING / MULTIPLEXING
+=============================================================================*/
 
 /**
  * @brief Poll multiple sockets for readiness.
  *
- * @param fds Array of pollfd structures.
- * @param nfds Number of sockets in fds.
- * @param timeout Timeout in milliseconds (-1 for infinite).
- * @return Number of ready sockets, 0 on timeout, or -1 on error.
+ * Waits for one or more sockets to become ready for I/O within a timeout period.
+ *
+ * @param sockets    Array of pointers to socket structures.
+ * @param count      Number of sockets in the array.
+ * @param timeout_ms Timeout in milliseconds.
+ * @return Number of sockets ready, 0 on timeout, or negative on error.
  */
-int fossil_network_socket_poll(fossil_network_pollfd_t *fds,
-                               size_t nfds, int timeout);
+int fossil_net_socket_poll(
+    fossil_net_socket_t **sockets,
+    uint32_t count,
+    uint32_t timeout_ms);
 
-// ------------------------------
-// Socket Shutdown
-// ------------------------------
+/*=============================================================================
+ERROR HANDLING
+=============================================================================*/
+
 /**
- * @brief Shut down part or all of a network socket connection.
+ * @brief Get the last socket error code.
  *
- * Allows a socket to be gracefully closed in one direction (read, write)
- * or both, depending on the 'how' argument.
+ * Returns the last error code produced by a socket operation.
  *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param how  Shutdown mode:
- *             0 = disable receives,
- *             1 = disable sends,
- *             2 = disable both.
+ * @return Error code (platform-specific).
+ */
+int fossil_net_socket_error_last(void);
+
+/**
+ * @brief Convert a socket error code to a human-readable string.
+ *
+ * Returns a string describing the specified error code.
+ *
+ * @param err Error code.
+ * @return Pointer to static string describing the error.
+ */
+const char *fossil_net_socket_error_string(int err);
+
+/*=============================================================================
+UTILITY
+=============================================================================*/
+
+/**
+ * @brief Sleep for a specified number of milliseconds.
+ *
+ * Suspends the calling thread for the given duration.
+ *
+ * @param ms Number of milliseconds to sleep.
  * @return 0 on success, non-zero on failure.
  */
-int fossil_network_socket_shutdown(fossil_network_socket_t *sock, int how);
-
-// ------------------------------
-// Datagram Support
-// ------------------------------
-/**
- * @brief Send a datagram (UDP or raw) to a specific address and port.
- *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param buf Pointer to the data buffer to send.
- * @param len Number of bytes to send.
- * @param address Destination address (IPv4 or IPv6 string).
- * @param port Destination port number.
- * @return Number of bytes sent, or -1 on error.
- */
-ssize_t fossil_network_socket_sendto(fossil_network_socket_t *sock,
-                                     const void *buf, size_t len,
-                                     const char *address, uint16_t port);
-
-/**
- * @brief Receive a datagram (UDP or raw) from a socket.
- *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param buf Buffer to store received data.
- * @param len Maximum number of bytes to receive.
- * @param address Output buffer for source address string.
- * @param addr_len Length of the address buffer.
- * @param port Output pointer for the source port.
- * @return Number of bytes received, or -1 on error.
- */
-ssize_t fossil_network_socket_recvfrom(fossil_network_socket_t *sock,
-                                       void *buf, size_t len,
-                                       char *address, size_t addr_len,
-                                       uint16_t *port);
-
-// ------------------------------
-// Timeout Helpers
-// ------------------------------
-/**
- * @brief Set send and receive timeouts for a socket.
- *
- * When a timeout is set, send/recv operations will return an error
- * if they block longer than the specified number of milliseconds.
- *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param send_ms Timeout for send operations in milliseconds (0 = no timeout).
- * @param recv_ms Timeout for receive operations in milliseconds (0 = no timeout).
- * @return 0 on success, non-zero on failure.
- */
-int fossil_network_socket_set_timeout(fossil_network_socket_t *sock,
-                                      int send_ms, int recv_ms);
-
-// ------------------------------
-// Single-Socket Wait
-// ------------------------------
-/**
- * @brief Wait for a socket to become readable or writable.
- *
- * This is a convenience wrapper around poll/select for one socket.
- *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @param events Bitmask: 1=readable, 2=writeable.
- * @param timeout Timeout in milliseconds (-1 for infinite).
- * @return Number of events ready (>0), 0 on timeout, or -1 on error.
- */
-int fossil_network_socket_wait(fossil_network_socket_t *sock,
-                               int events, int timeout);
-
-// ------------------------------
-// Address Helpers
-// ------------------------------
-/**
- * @brief Check if a socket uses IPv6.
- *
- * @param sock Pointer to a fossil_network_socket_t structure.
- * @return 1 if IPv6, 0 if IPv4, -1 on error.
- */
-int fossil_network_socket_is_ipv6(fossil_network_socket_t *sock);
-
-// ------------------------------
-// Cross-Platform Error Codes
-// ------------------------------
-/**
- * @brief Normalized cross-platform error codes for sockets.
- *
- * These map common platform-specific error values (errno/WSAGetLastError)
- * into a consistent set used by Fossil sockets.
- */
-typedef enum {
-    FOSSIL_NET_OK = 0,            /**< No error */
-    FOSSIL_NET_ERR_UNKNOWN = -1,  /**< Unmapped/unknown error */
-    FOSSIL_NET_ERR_WOULDBLOCK,    /**< Operation would block */
-    FOSSIL_NET_ERR_CONNRESET,     /**< Connection reset by peer */
-    FOSSIL_NET_ERR_TIMEDOUT,      /**< Operation timed out */
-    FOSSIL_NET_ERR_REFUSED,       /**< Connection refused */
-    FOSSIL_NET_ERR_ADDRINUSE,     /**< Address already in use */
-    FOSSIL_NET_ERR_NETDOWN,       /**< Network is down */
-    FOSSIL_NET_ERR_NETUNREACH,    /**< Network unreachable */
-    FOSSIL_NET_ERR_HOSTUNREACH    /**< Host unreachable */
-} fossil_network_error_t;
-
-/**
- * @brief Translate the last platform-specific socket error
- *        into a fossil_network_error_t code.
- *
- * @return Normalized fossil_network_error_t error code.
- */
-fossil_network_error_t fossil_network_socket_translate_error(void);
+int fossil_net_socket_sleep(uint32_t ms);
 
 #ifdef __cplusplus
 }
-#include <stdexcept>
 #include <string>
-#include <utility>
-#include <memory>
+#include <cstring>
 
-namespace fossil {
+namespace fossil::net
+{
 
-namespace network {
-
-    /**
-     * @brief C++ RAII wrapper for fossil_network_socket_t.
-     *
-     * This class provides a convenient, exception-safe C++ interface to the Fossil
-     * network socket API. It manages the socket's lifetime, disables copying,
-     * and supports move semantics. All socket operations are provided as member
-     * functions, and static helpers are available for global socket operations.
-     */
-    class Socket {
+    class Socket
+    {
     public:
         /**
-         * @brief Default constructor. Initializes the internal socket structure to zero.
+         * @brief Default constructor.
+         *
+         * Initializes the internal socket structure to zero.
          */
-        Socket() { memset(&c_sock_, 0, sizeof(c_sock_)); }
-
-        /**
-         * @brief Construct from an existing fossil_network_socket_t.
-         * @param s The C socket structure to wrap.
-         */
-        explicit Socket(const fossil_network_socket_t& s) : c_sock_(s) {}
-
-        /**
-         * @brief Destructor. Closes the socket if open.
-         */
-        ~Socket() { close(); }
-
-        // Non-copyable
-        /**
-         * @brief Copy constructor (deleted).
-         */
-        Socket(const Socket&) = delete;
-        /**
-         * @brief Copy assignment (deleted).
-         */
-        Socket& operator=(const Socket&) = delete;
-
-        // Movable
-        /**
-         * @brief Move constructor. Transfers ownership of the socket.
-         * @param other The socket to move from.
-         */
-        Socket(Socket&& other) noexcept { c_sock_ = other.c_sock_; other.c_sock_.fd = -1; }
-
-        /**
-         * @brief Move assignment. Closes this socket and takes ownership from other.
-         * @param other The socket to move from.
-         * @return Reference to this socket.
-         */
-        Socket& operator=(Socket&& other) noexcept {
-            if (this != &other) {
-                close();
-                c_sock_ = other.c_sock_;
-                other.c_sock_.fd = -1;
-            }
-            return *this;
+        Socket()
+        {
+            std::memset(&sock_, 0, sizeof(sock_));
         }
 
         /**
-         * @brief Initialize the socket subsystem (Windows only).
-         * @return 0 on success, non-zero on failure.
+         * @brief Destructor.
+         *
+         * Closes the socket and releases any associated resources.
          */
-        static int init() { return fossil_network_socket_init(); }
-
-        /**
-         * @brief Cleanup the socket subsystem (Windows only).
-         * @return 0 on success, non-zero on failure.
-         */
-        static int cleanup() { return fossil_network_socket_cleanup(); }
-
-        /**
-         * @brief Convert protocol name to fossil_protocol_t.
-         * @param name Protocol name string.
-         * @return Protocol enumeration value.
-         */
-        static fossil_protocol_t proto_from_name(const std::string& name) {
-            return fossil_network_socket_proto_from_name(name.c_str());
-        }
-
-        /**
-         * @brief Convert fossil_protocol_t to protocol name string.
-         * @param proto Protocol enumeration value.
-         * @return Protocol name string.
-         */
-        static std::string proto_to_name(fossil_protocol_t proto) {
-            return fossil_network_socket_proto_to_name(proto);
+        ~Socket()
+        {
+            socket_close();
         }
 
         /**
          * @brief Create a new socket.
-         * @param family Address family (e.g., AF_INET).
-         * @param proto Protocol type.
+         *
+         * Initializes the socket with the specified type and address family.
+         *
+         * @param type   Socket type string ID.
+         * @param family Address family string ID.
          * @return 0 on success, non-zero on failure.
          */
-        int create(int family, fossil_protocol_t proto) {
-            return fossil_network_socket_create(&c_sock_, family, proto);
+        int socket_create(const std::string &type, const std::string &family)
+        {
+            return fossil_net_socket_create(&sock_, type.c_str(), family.c_str());
+        }
+
+        /**
+         * @brief Close the socket.
+         *
+         * Closes the underlying OS socket handle and resets the structure.
+         *
+         * @return 0 on success, non-zero on failure.
+         */
+        int socket_close()
+        {
+            return fossil_net_socket_close(&sock_);
+        }
+
+        /**
+         * @brief Set blocking or non-blocking mode.
+         *
+         * Configures the socket to operate in blocking or non-blocking mode.
+         *
+         * @param blocking true for blocking, false for non-blocking.
+         * @return 0 on success, non-zero on failure.
+         */
+        int socket_set_blocking(bool blocking)
+        {
+            return fossil_net_socket_set_blocking(&sock_, blocking);
         }
 
         /**
          * @brief Bind the socket to a local address and port.
-         * @param address Local address string.
-         * @param port Local port number.
+         *
+         * Associates the socket with a specific local IP address and port.
+         *
+         * @param addr Pointer to address structure.
          * @return 0 on success, non-zero on failure.
          */
-        int bind(const std::string& address, uint16_t port) {
-            return fossil_network_socket_bind(&c_sock_, address.c_str(), port);
+        int socket_bind(const fossil_net_address_t *addr)
+        {
+            return fossil_net_socket_bind(&sock_, addr);
         }
 
         /**
-         * @brief Set the socket to listen for incoming connections.
-         * @param backlog Maximum number of pending connections.
+         * @brief Listen for incoming connections.
+         *
+         * Marks the socket as a passive socket to accept incoming connection requests.
+         *
+         * @param backlog Maximum length of the pending connections queue.
          * @return 0 on success, non-zero on failure.
          */
-        int listen(int backlog) {
-            return fossil_network_socket_listen(&c_sock_, backlog);
+        int socket_listen(int backlog)
+        {
+            return fossil_net_socket_listen(&sock_, backlog);
         }
 
         /**
          * @brief Accept an incoming connection.
-         * @param client Socket object to receive the new connection.
+         *
+         * Accepts a new connection and initializes a client socket structure.
+         * Optionally fills in the address of the connecting peer.
+         *
+         * @param client Reference to client socket to initialize.
+         * @param addr   Pointer to address structure to receive peer info (optional).
          * @return 0 on success, non-zero on failure.
          */
-        int accept(Socket& client) {
-            return fossil_network_socket_accept(&c_sock_, &client.c_sock_);
+        int socket_accept(Socket &client, fossil_net_address_t *addr)
+        {
+            return fossil_net_socket_accept(&sock_, &client.sock_, addr);
         }
 
         /**
-         * @brief Connect the socket to a remote address and port.
-         * @param address Remote address string.
-         * @param port Remote port number.
+         * @brief Connect the socket to a remote address.
+         *
+         * Initiates a connection to the specified remote IP address and port.
+         *
+         * @param addr Pointer to remote address structure.
          * @return 0 on success, non-zero on failure.
          */
-        int connect(const std::string& address, uint16_t port) {
-            return fossil_network_socket_connect(&c_sock_, address.c_str(), port);
-        }
-
-        /**
-         * @brief Close the socket and release its resources.
-         * @return 0 on success, non-zero on failure.
-         */
-        int close() {
-            if (c_sock_.fd != (fossil_socket_fd_t)-1) {
-                int r = fossil_network_socket_close(&c_sock_);
-                c_sock_.fd = (fossil_socket_fd_t)-1;
-                return r;
-            }
-            return 0;
+        int socket_connect(const fossil_net_address_t *addr)
+        {
+            return fossil_net_socket_connect(&sock_, addr);
         }
 
         /**
          * @brief Send data through the socket.
-         * @param buffer Pointer to data buffer.
-         * @param length Number of bytes to send.
-         * @return Number of bytes sent, or -1 on error.
+         *
+         * Sends a buffer of data over the socket.
+         *
+         * @param data Pointer to data buffer to send.
+         * @param size Size of data buffer in bytes.
+         * @param sent Pointer to variable to receive number of bytes sent.
+         * @return 0 on success, non-zero on failure.
          */
-        ssize_t send(const void* buffer, size_t length) {
-            return fossil_network_socket_send(&c_sock_, buffer, length);
+        int socket_send(const void *data, uint32_t size, uint32_t *sent)
+        {
+            return fossil_net_socket_send(&sock_, data, size, sent);
         }
 
         /**
          * @brief Receive data from the socket.
-         * @param buffer Pointer to receive buffer.
-         * @param length Maximum number of bytes to receive.
-         * @return Number of bytes received, or -1 on error.
-         */
-        ssize_t recv(void* buffer, size_t length) {
-            return fossil_network_socket_recv(&c_sock_, buffer, length);
-        }
-
-        /**
-         * @brief Open and optionally connect or bind a socket.
-         * @param proto_name Protocol name string.
-         * @param address Address to bind or connect to.
-         * @param port Port number.
+         *
+         * Receives data from the socket into the provided buffer.
+         *
+         * @param buffer   Pointer to buffer to receive data.
+         * @param size     Size of buffer in bytes.
+         * @param received Pointer to variable to receive number of bytes received.
          * @return 0 on success, non-zero on failure.
          */
-        int open(const std::string& proto_name, const std::string& address, uint16_t port) {
-            return fossil_network_socket_open(&c_sock_, proto_name.c_str(), address.c_str(), port);
+        int socket_receive(void *buffer, uint32_t size, uint32_t *received)
+        {
+            return fossil_net_socket_receive(&sock_, buffer, size, received);
         }
 
         /**
-         * @brief Set an integer socket option.
-         * @param level Protocol level.
-         * @param option Option name.
-         * @param value Integer value to set.
-         * @return 0 on success, non-zero on failure.
+         * @brief Get a pointer to the native socket structure.
+         *
+         * @return Pointer to the internal fossil_net_socket_t structure.
          */
-        int set_option(int level, int option, int value) {
-            return fossil_network_socket_set_option(&c_sock_, level, option, value);
-        }
+        fossil_net_socket_t *native_handle() { return &sock_; }
 
         /**
-         * @brief Get an integer socket option.
-         * @param level Protocol level.
-         * @param option Option name.
-         * @param value Output pointer for the value.
-         * @return 0 on success, non-zero on failure.
+         * @brief Get a const pointer to the native socket structure.
+         *
+         * @return Const pointer to the internal fossil_net_socket_t structure.
          */
-        int get_option(int level, int option, int* value) {
-            return fossil_network_socket_get_option(&c_sock_, level, option, value);
-        }
-
-        /**
-         * @brief Set the socket to blocking or non-blocking mode.
-         * @param nonblock 1 for non-blocking, 0 for blocking.
-         * @return 0 on success, non-zero on failure.
-         */
-        int set_nonblocking(int nonblock) {
-            return fossil_network_socket_set_nonblocking(&c_sock_, nonblock);
-        }
-
-        /**
-         * @brief Resolve a hostname to an IP address.
-         * @param hostname Hostname string.
-         * @param ip_buffer Buffer for resulting IP address.
-         * @param ip_buffer_len Length of ip_buffer.
-         * @return 0 on success, non-zero on failure.
-         */
-        static int resolve_hostname(const std::string& hostname, char* ip_buffer, size_t ip_buffer_len) {
-            return fossil_network_socket_resolve_hostname(hostname.c_str(), ip_buffer, ip_buffer_len);
-        }
-
-        /**
-         * @brief Get the local or remote address of the socket.
-         * @param buffer Buffer to store address string.
-         * @param buffer_len Length of buffer.
-         * @param remote 1 for remote address, 0 for local address.
-         * @return 0 on success, non-zero on failure.
-         */
-        int get_address(char* buffer, size_t buffer_len, int remote) {
-            return fossil_network_socket_get_address(&c_sock_, buffer, buffer_len, remote);
-        }
-
-        /**
-         * @brief Get the last socket error code.
-         * @return Platform-specific error code.
-         */
-        static int last_error() { return fossil_network_socket_last_error(); }
-
-        /**
-         * @brief Convert a socket error code to a human-readable string.
-         * @param err Error code.
-         * @return Error string.
-         */
-        static std::string error_string(int err) { return fossil_network_socket_error_string(err); }
-
-        /**
-         * @brief Poll multiple sockets for readiness.
-         * @param fds Array of pollfd structures.
-         * @param nfds Number of sockets in fds.
-         * @param timeout Timeout in milliseconds.
-         * @return Number of ready sockets, 0 on timeout, or -1 on error.
-         */
-        static int poll(fossil_network_pollfd_t* fds, size_t nfds, int timeout) {
-            return fossil_network_socket_poll(fds, nfds, timeout);
-        }
-
-        /**
-         * @brief Shut down part or all of the socket connection.
-         * @param how Shutdown mode (0=recv, 1=send, 2=both).
-         * @return 0 on success, non-zero on failure.
-         */
-        int shutdown(int how) {
-            return fossil_network_socket_shutdown(&c_sock_, how);
-        }
-
-        /**
-         * @brief Send a datagram to a specific address and port.
-         * @param buf Data buffer to send.
-         * @param len Number of bytes to send.
-         * @param address Destination address string.
-         * @param port Destination port number.
-         * @return Number of bytes sent, or -1 on error.
-         */
-        ssize_t sendto(const void* buf, size_t len, const std::string& address, uint16_t port) {
-            return fossil_network_socket_sendto(&c_sock_, buf, len, address.c_str(), port);
-        }
-
-        /**
-         * @brief Receive a datagram from the socket.
-         * @param buf Buffer to store received data.
-         * @param len Maximum number of bytes to receive.
-         * @param address Output buffer for source address.
-         * @param addr_len Length of address buffer.
-         * @param port Output pointer for source port.
-         * @return Number of bytes received, or -1 on error.
-         */
-        ssize_t recvfrom(void* buf, size_t len, char* address, size_t addr_len, uint16_t* port) {
-            return fossil_network_socket_recvfrom(&c_sock_, buf, len, address, addr_len, port);
-        }
-
-        /**
-         * @brief Set send and receive timeouts for the socket.
-         * @param send_ms Send timeout in milliseconds.
-         * @param recv_ms Receive timeout in milliseconds.
-         * @return 0 on success, non-zero on failure.
-         */
-        int set_timeout(int send_ms, int recv_ms) {
-            return fossil_network_socket_set_timeout(&c_sock_, send_ms, recv_ms);
-        }
-
-        /**
-         * @brief Wait for the socket to become readable or writable.
-         * @param events Bitmask: 1=readable, 2=writeable.
-         * @param timeout Timeout in milliseconds.
-         * @return Number of events ready, 0 on timeout, or -1 on error.
-         */
-        int wait(int events, int timeout) {
-            return fossil_network_socket_wait(&c_sock_, events, timeout);
-        }
-
-        /**
-         * @brief Check if the socket uses IPv6.
-         * @return 1 if IPv6, 0 if IPv4, -1 on error.
-         */
-        int is_ipv6() {
-            return fossil_network_socket_is_ipv6(&c_sock_);
-        }
-
-        /**
-         * @brief Translate the last platform-specific socket error.
-         * @return Normalized fossil_network_error_t error code.
-         */
-        static fossil_network_error_t translate_error() {
-            return fossil_network_socket_translate_error();
-        }
-
-        /**
-         * @brief Get a pointer to the underlying fossil_network_socket_t.
-         * @return Pointer to the internal socket structure.
-         */
-        fossil_network_socket_t* native_handle() { return &c_sock_; }
-
-        /**
-         * @brief Get a const pointer to the underlying fossil_network_socket_t.
-         * @return Const pointer to the internal socket structure.
-         */
-        const fossil_network_socket_t* native_handle() const { return &c_sock_; }
+        const fossil_net_socket_t *native_handle() const { return &sock_; }
 
     private:
-        /**
-         * @brief Internal C socket structure.
-         */
-        fossil_network_socket_t c_sock_;
+        fossil_net_socket_t sock_;
     };
-
-} // namespace network
 
 } // namespace fossil
 

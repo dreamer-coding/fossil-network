@@ -1,40 +1,19 @@
 dir = include_directories('.')
-cc = meson.get_compiler('c')
-add_project_arguments('-D_POSIX_C_SOURCE=200112L', language: 'c')
-add_project_arguments('-D_POSIX_C_SOURCE=200112L', language: 'cpp')
 
-# ------------------------------
-# Platform-specific dependencies
-# ------------------------------
-if host_machine.system() == 'windows'
-    winsock_dep = cc.find_library('ws2_32', required: true)
-    bcrypt_dep  = cc.find_library('bcrypt', required: true)
-else
-    winsock_dep = []
-    bcrypt_dep  = []
-endif
+subdir('fossil')
 
-# ------------------------------
-# Fossil Network static library
-# ------------------------------
 fossil_network_lib = library(
     'fossil_network',
     files(
-        'socket.c', 'echo.c'
+        'socket.c'
     ),
     install: true,
-    dependencies: [cc.find_library('m', required: false),
-                   winsock_dep,
-                   bcrypt_dep],
+    dependencies: platform_deps,
     include_directories: dir
 )
 
-# ------------------------------
-# Fossil Network dependency object
-# ------------------------------
 fossil_network_dep = declare_dependency(
     link_with: [fossil_network_lib],
-    dependencies: [winsock_dep, bcrypt_dep],
     include_directories: dir
 )
 

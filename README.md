@@ -1,37 +1,37 @@
 # **Fossil Network by Fossil Logic**
 
-**Fossil Network** is a portable, cross-platform sockets library in pure C, designed for efficient and reliable network communication with zero external dependencies. It provides unified type definitions and abstractions for Windows, macOS, BSD, and Linux, ensuring seamless integration and consistent behavior across platforms.
+**Fossil Network** is a portable, cross-platform C library for sockets and networking, designed for efficiency, reliability, and zero external dependencies. It uses string-based type IDs (e.g., `fossil.net.socket.type.tcp`, `fossil.net.family.ipv4`) for socket types, address families, and options, providing a modern, unified API for Windows, macOS, BSD, and Linux.
 
 ### Key Features
 
-- **Portable Type Definitions**  
-  Handles platform-specific differences (Windows, macOS/BSD, Linux) for socket types, error codes, and system headers.
+- **String-Based Type and Option IDs**  
+  Socket types (`fossil.net.socket.type.tcp`, `fossil.net.socket.type.udp`, `fossil.net.socket.type.raw`), address families (`fossil.net.family.ipv4`, `fossil.net.family.ipv6`), and options (`fossil.net.socket.blocking`, `fossil.net.socket.reuseaddr`) are referenced by string IDs for clarity and extensibility.
 
-- **Unified Socket API**  
-  Core structures (`fossil_network_socket_t`, `fossil_network_pollfd_t`) abstract file descriptors and socket operations for all supported platforms.
+- **Unified Core Structures**  
+  Core types like `fossil_net_socket_t`, `fossil_net_address_t`, and `fossil_net_mac_t` abstract platform-specific details, including socket handles, IDs, types, families, and MAC addresses.
 
-- **Comprehensive Protocol Support**  
-  Built-in enumeration for TCP, UDP, raw sockets, and common application protocols (HTTP, HTTPS, FTP, SSH, DNS, etc.).
+- **Simple Lifecycle Management**  
+  Explicit initialization and shutdown functions (`fossil_net_socket_init`, `fossil_net_socket_shutdown`) ensure proper setup and cleanup across platforms.
 
-- **Convenient Socket Operations**  
-  Functions for socket creation, binding, listening, accepting, connecting, sending, receiving, polling, and shutdown.
+- **Comprehensive Socket Operations**  
+  Functions for creating, binding, listening, accepting, connecting, sending, receiving, and closing sockets, all using the unified string-based API.
 
-- **Cross-Platform Error Handling**  
-  Normalized error codes and translation helpers for consistent error reporting regardless of OS.
+- **Blocking and Non-Blocking Modes**  
+  Easily toggle blocking behavior per socket with `fossil_net_socket_set_blocking`.
 
-- **Timeouts and Non-Blocking I/O**  
-  Easily set timeouts and toggle blocking modes for sockets, with helpers for event-driven and asynchronous networking.
+- **Address and Host Utilities**  
+  Parse and format addresses, resolve hostnames, retrieve local hostnames, and handle MAC addresses with dedicated helpers.
 
-- **Address and Option Utilities**  
-  Helpers for hostname resolution, address retrieval, and socket option management.
+- **Polling and Multiplexing**  
+  Poll multiple sockets for readiness with a single call, supporting scalable I/O.
 
-- **Datagram Support**  
-  Send and receive UDP/raw datagrams with address/port helpers.
+- **Consistent Error Handling**  
+  Retrieve and describe socket errors in a platform-agnostic way.
 
 - **Minimal Footprint**  
-  No external dependencies; suitable for embedded, desktop, and server environments.
+  No external dependencies, suitable for embedded, desktop, and server environments.
 
-**Fossil Network** simplifies socket programming by abstracting platform quirks and providing a consistent, modern C API for building robust networked applications.
+**Fossil Network** streamlines cross-platform socket programming by abstracting OS quirks and exposing a consistent, extensible C API for robust networked applications.
 
 ---
 
@@ -54,7 +54,7 @@ Add the `fossil-network.wrap` file in your `subprojects` directory and include t
 ```ini
 [wrap-git]
 url = https://github.com/fossillogic/fossil-network.git
-revision = v0.1.2
+revision = v0.1.3
 
 [provide]
 dependency_names = fossil-network
