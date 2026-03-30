@@ -270,6 +270,70 @@ int fossil_net_socket_receive(fossil_net_socket_t *sock, void *buffer, uint32_t 
 }
 
 /*=============================================================================
+ADDRESS UTILITIES
+=============================================================================*/
+
+/**
+ * @brief Parse an IP address and port into an address structure.
+ *
+ * Converts a string IP and port number into a fossil_net_address_t structure.
+ *
+ * @param addr Pointer to address structure to fill.
+ * @param ip   String representation of IP address.
+ * @param port Port number.
+ * @return 0 on success, non-zero on failure.
+ */
+int fossil_net_socket_address_parse(
+    fossil_net_address_t *addr,
+    const char *ip,
+    uint16_t port)
+{
+    if (!addr || !ip) return -1;
+    memset(addr, 0, sizeof(*addr));
+    strncpy(addr->ip, ip, sizeof(addr->ip) - 1);
+    addr->port = port;
+
+    // Try IPv4 first
+    struct in_addr ipv4;
+    if (inet_pton(AF_INET, ip, &ipv4) == 1) {
+        strncpy(addr->family, "fossil.net.family.ipv4", sizeof(addr->family) - 1);
+        return 0;
+    }
+#if defined(AF_INET6)
+    struct in6_addr ipv6;
+    if (inet_pton(AF_INET6, ip, &ipv6) == 1) {
+        strncpy(addr->family, "fossil.net.family.ipv6", sizeof(addr->family) - 1);
+        return 0;
+    }
+#endif
+    return -1;
+}
+
+int fossil_net_socket_address_to_string(
+    const fossil_net_address_t *addr,
+    char *buffer,
+    uint32_t size)
+{
+    if (!addr || !buffer || size == 0) return -1;
+
+    if (!strcmp(addr->family, "fossil.net.family.ipv4")) {
+        // IPv4: "x.x.x.x:port"
+        int n = snprintf(buffer, size, "%s:%u", addr->ip, addr->port);
+        if (n < 0 || (uint32_t)n >= size) return -1;
+        return 0;
+    }
+#if defined(AF_INET6)
+    else if (!strcmp(addr->family, "fossil.net.family.ipv6")) {
+        // IPv6: "[addr]:port"
+        int n = snprintf(buffer, size, "[%s]:%u", addr->ip, addr->port);
+        if (n < 0 || (uint32_t)n >= size) return -1;
+        return 0;
+    }
+#endif
+    return -1;
+}
+
+/*=============================================================================
 UTILITY
 =============================================================================*/
 
