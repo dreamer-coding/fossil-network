@@ -54,8 +54,6 @@
 ERROR HANDLING
 =============================================================================*/
 
-static int fossil_net_last_error = 0;
-
 int fossil_net_socket_error_last(void) {
 #if defined(_WIN32)
     return WSAGetLastError();
@@ -120,7 +118,7 @@ int fossil_net_socket_create(fossil_net_socket_t *sock, const char *type, const 
 
 #if defined(_WIN32)
     sock->handle = (void*)socket(af, stype, 0);
-    if (sock->handle == INVALID_SOCKET) return -1;
+    if ((SOCKET)sock->handle == INVALID_SOCKET) return -1;
 #else
     sock->handle = (void*)(intptr_t)socket(af, stype, 0);
     if ((intptr_t)sock->handle < 0) return -1;
