@@ -79,18 +79,6 @@ typedef struct fossil_net_mac
 } fossil_net_mac_t;
 
 /*=============================================================================
-THREADING
-=============================================================================*/
-
-typedef struct fossil_net_socket_thread
-{
-    void *handle;
-    char id[64];
-} fossil_net_socket_thread_t;
-
-typedef void (*fossil_net_socket_thread_fn)(void *arg);
-
-/*=============================================================================
 LIFECYCLE
 =============================================================================*/
 

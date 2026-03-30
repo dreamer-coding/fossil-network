@@ -28,9 +28,6 @@
 - **Consistent Error Handling**  
   Retrieve and describe socket errors in a platform-agnostic way.
 
-- **Threading Support**  
-  Structures and helpers for socket-related threading.
-
 - **Minimal Footprint**  
   No external dependencies, suitable for embedded, desktop, and server environments.
 
