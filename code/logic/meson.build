@@ -5,7 +5,9 @@ subdir('fossil')
 fossil_network_lib = library(
     'fossil_network',
     files(
-        'socket.c'
+        'socket.c',
+        'server.c',
+        'client.c'
     ),
     install: true,
     dependencies: platform_deps,

@@ -53,23 +53,23 @@ FOSSIL_TEARDOWN(c_socket_fixture) {
 FOSSIL_TEST(c_socket_test_socket_create_types_and_families) {
     fossil_net_socket_t sock;
     // TCP IPv4
-    int rc = fossil_net_socket_create(&sock, "fossil.net.socket.type.tcp", "fossil.net.family.ipv4");
+    int rc = fossil_net_socket_create(&sock, "tcp", "ipv4");
     ASSUME_ITS_TRUE(rc == 0);
     fossil_net_socket_close(&sock);
     // TCP IPv6
-    rc = fossil_net_socket_create(&sock, "fossil.net.socket.type.tcp", "fossil.net.family.ipv6");
+    rc = fossil_net_socket_create(&sock, "tcp", "ipv6");
     ASSUME_ITS_TRUE(rc == 0);
     fossil_net_socket_close(&sock);
     // UDP IPv4
-    rc = fossil_net_socket_create(&sock, "fossil.net.socket.type.udp", "fossil.net.family.ipv4");
+    rc = fossil_net_socket_create(&sock, "udp", "ipv4");
     ASSUME_ITS_TRUE(rc == 0);
     fossil_net_socket_close(&sock);
     // UDP IPv6
-    rc = fossil_net_socket_create(&sock, "fossil.net.socket.type.udp", "fossil.net.family.ipv6");
+    rc = fossil_net_socket_create(&sock, "udp", "ipv6");
     ASSUME_ITS_TRUE(rc == 0);
     fossil_net_socket_close(&sock);
     // RAW IPv4
-    rc = fossil_net_socket_create(&sock, "fossil.net.socket.type.raw", "fossil.net.family.ipv4");
+    rc = fossil_net_socket_create(&sock, "raw", "ipv4");
     // RAW sockets may require privileges, so allow failure
     ASSUME_ITS_TRUE(rc == 0 || rc == -1);
     if (rc == 0) fossil_net_socket_close(&sock);
@@ -77,7 +77,7 @@ FOSSIL_TEST(c_socket_test_socket_create_types_and_families) {
 
 FOSSIL_TEST(c_socket_test_socket_blocking_option) {
     fossil_net_socket_t sock;
-    int rc = fossil_net_socket_create(&sock, "fossil.net.socket.type.tcp", "fossil.net.family.ipv4");
+    int rc = fossil_net_socket_create(&sock, "tcp", "ipv4");
     ASSUME_ITS_TRUE(rc == 0);
     rc = fossil_net_socket_set_blocking(&sock, false);
     ASSUME_ITS_TRUE(rc == 0);
@@ -99,7 +99,7 @@ FOSSIL_TEST(c_socket_test_socket_address_parse_and_to_string) {
 FOSSIL_TEST(c_socket_test_socket_bind_and_listen_ipv6) {
     fossil_net_socket_t sock;
     fossil_net_address_t addr;
-    int rc = fossil_net_socket_create(&sock, "fossil.net.socket.type.tcp", "fossil.net.family.ipv6");
+    int rc = fossil_net_socket_create(&sock, "tcp", "ipv6");
     ASSUME_ITS_TRUE(rc == 0);
     rc = fossil_net_socket_address_parse(&addr, "::1", 0);
     ASSUME_ITS_TRUE(rc == 0);
@@ -132,7 +132,7 @@ FOSSIL_TEST(c_socket_test_socket_resolve_and_hostname) {
 
 FOSSIL_TEST(c_socket_test_socket_poll_timeout) {
     fossil_net_socket_t sock;
-    int rc = fossil_net_socket_create(&sock, "fossil.net.socket.type.tcp", "fossil.net.family.ipv4");
+    int rc = fossil_net_socket_create(&sock, "tcp", "ipv4");
     ASSUME_ITS_TRUE(rc == 0);
     fossil_net_socket_t *socks[1] = { &sock };
     int ready = fossil_net_socket_poll(socks, 1, 100);
