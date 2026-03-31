@@ -121,7 +121,111 @@ int fossil_net_server_set_blocking(
 namespace fossil::net
 {
 
+    class Server
+    {
+    private:
+        fossil_net_server_t *server_;
 
+    public:
+        /**
+         * @brief Construct a new Server object.
+         *
+         * Wraps fossil_net_server_create.
+         */
+        Server(const std::string &type, const std::string &family, const std::string &addr, uint16_t port)
+            : server_(nullptr)
+        {
+            server_ = fossil_net_server_create(type.c_str(), family.c_str(), addr.empty() ? nullptr : addr.c_str(), port);
+        }
+
+        /**
+         * @brief Destructor. Releases server resources.
+         *
+         * Wraps fossil_net_server_destroy.
+         */
+        ~Server()
+        {
+            if (server_)
+                fossil_net_server_destroy(server_);
+        }
+
+        /**
+         * @brief Start listening for incoming connections.
+         *
+         * Wraps fossil_net_server_listen.
+         */
+        int listen(int backlog)
+        {
+            return fossil_net_server_listen(server_, backlog);
+        }
+
+        /**
+         * @brief Accept an incoming client connection.
+         *
+         * Wraps fossil_net_server_accept.
+         */
+        int accept(fossil_net_socket_t *client_sock, fossil_net_address_t *client_addr = nullptr)
+        {
+            return fossil_net_server_accept(server_, client_sock, client_addr);
+        }
+
+        /**
+         * @brief Get the local address the server is bound to.
+         *
+         * Wraps fossil_net_server_get_address.
+         */
+        int get_address(fossil_net_address_t *addr)
+        {
+            return fossil_net_server_get_address(server_, addr);
+        }
+
+        /**
+         * @brief Set blocking or non-blocking mode for the server socket.
+         *
+         * Wraps fossil_net_server_set_blocking.
+         */
+        int set_blocking(bool blocking)
+        {
+            return fossil_net_server_set_blocking(server_, blocking);
+        }
+
+        /**
+         * @brief Check if the server is valid.
+         */
+        bool is_valid() const
+        {
+            return server_ != nullptr;
+        }
+
+        /**
+         * @brief Get the underlying C server pointer.
+         */
+        fossil_net_server_t *native_handle() const
+        {
+            return server_;
+        }
+
+        // Disable copy
+        Server(const Server &) = delete;
+        Server &operator=(const Server &) = delete;
+
+        // Allow move
+        Server(Server &&other) noexcept : server_(other.server_)
+        {
+            other.server_ = nullptr;
+        }
+        Server &operator=(Server &&other) noexcept
+        {
+            if (this != &other)
+            {
+                if (server_)
+                    fossil_net_server_destroy(server_);
+                server_ = other.server_;
+                other.server_ = nullptr;
+            }
+            return *this;
+        }
+    };
 
 } // namespace fossil
 

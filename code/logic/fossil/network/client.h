@@ -150,7 +150,135 @@ const char *fossil_net_client_error_string(int err);
 namespace fossil::net
 {
 
+    class Client
+    {
+    private:
+        fossil_net_client_t *handle_;
 
+    public:
+        //=============================================================================
+        // CLIENT INTERFACE
+        //=============================================================================
+
+        /**
+         * @brief Construct a new Client object.
+         *
+         * Allocates and initializes a client for the specified protocol and address family.
+         */
+        Client(const char *type, const char *family)
+            : handle_(fossil_net_client_create(type, family))
+        {}
+
+        /**
+         * @brief Destroy the Client object and release its resources.
+         */
+        ~Client()
+        {
+            if (handle_)
+                fossil_net_client_destroy(handle_);
+        }
+
+        /**
+         * @brief Connect the client to a remote address.
+         */
+        int connect(const fossil_net_address_t *addr)
+        {
+            return fossil_net_client_connect(handle_, addr);
+        }
+
+        /**
+         * @brief Disconnect the client from the remote host.
+         */
+        int disconnect()
+        {
+            return fossil_net_client_disconnect(handle_);
+        }
+
+        /**
+         * @brief Send data through the client connection.
+         */
+        int send(const void *data, uint32_t size, uint32_t *sent)
+        {
+            return fossil_net_client_send(handle_, data, size, sent);
+        }
+
+        /**
+         * @brief Receive data from the client connection.
+         */
+        int receive(void *buffer, uint32_t size, uint32_t *received)
+        {
+            return fossil_net_client_receive(handle_, buffer, size, received);
+        }
+
+        /**
+         * @brief Get the local address of the client.
+         */
+        int get_local_address(fossil_net_address_t *addr)
+        {
+            return fossil_net_client_get_local_address(handle_, addr);
+        }
+
+        /**
+         * @brief Get the remote address the client is connected to.
+         */
+        int get_remote_address(fossil_net_address_t *addr)
+        {
+            return fossil_net_client_get_remote_address(handle_, addr);
+        }
+
+        /**
+         * @brief Set blocking or non-blocking mode for the client.
+         */
+        int set_blocking(bool blocking)
+        {
+            return fossil_net_client_set_blocking(handle_, blocking);
+        }
+
+        /**
+         * @brief Get the last error code for the client.
+         */
+        int error_last()
+        {
+            return fossil_net_client_error_last(handle_);
+        }
+
+        /**
+         * @brief Convert a client error code to a human-readable string.
+         */
+        static const char *error_string(int err)
+        {
+            return fossil_net_client_error_string(err);
+        }
+
+        /**
+         * @brief Get the underlying C handle.
+         */
+        fossil_net_client_t *native_handle() const
+        {
+            return handle_;
+        }
+
+        // Disable copy
+        Client(const Client &) = delete;
+        Client &operator=(const Client &) = delete;
+
+        // Allow move
+        Client(Client &&other) noexcept : handle_(other.handle_)
+        {
+            other.handle_ = nullptr;
+        }
+        Client &operator=(Client &&other) noexcept
+        {
+            if (this != &other)
+            {
+                if (handle_)
+                    fossil_net_client_destroy(handle_);
+                handle_ = other.handle_;
+                other.handle_ = nullptr;
+            }
+            return *this;
+        }
+    };
 
 } // namespace fossil
 
