@@ -528,6 +528,7 @@ int fossil_net_socket_resolve(const char *hostname, fossil_net_address_t *out_ad
         if (addr_in) {
             inet_ntop(AF_INET, addr_in, out_addr->ip, sizeof(out_addr->ip));
             strncpy(out_addr->addr, out_addr->ip, sizeof(out_addr->addr) - 1);
+            out_addr->addr[sizeof(out_addr->addr) - 1] = '\0';
             out_addr->port = 0;
             strncpy(out_addr->family, "ipv4", sizeof(out_addr->family) - 1);
             return 0;
