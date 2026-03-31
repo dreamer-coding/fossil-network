@@ -214,11 +214,18 @@ int fossil_net_socket_accept(fossil_net_socket_t *server, fossil_net_socket_t *c
     socklen_t salen = sizeof(sa);
 
 #if defined(_WIN32)
+    u_long mode = 1;
+    ioctlsocket((SOCKET)server->handle, FIONBIO, &mode); // set non-blocking
     SOCKET s = accept((SOCKET)server->handle, (struct sockaddr*)&sa, &salen);
+    mode = server->blocking ? 0 : 1;
+    ioctlsocket((SOCKET)server->handle, FIONBIO, &mode); // restore blocking mode
     if (s == INVALID_SOCKET) return -1;
     client->handle = (void*)s;
 #else
+    int flags = fcntl((int)(intptr_t)server->handle, F_GETFL, 0);
+    fcntl((int)(intptr_t)server->handle, F_SETFL, flags | O_NONBLOCK); // set non-blocking
     int s = accept((int)(intptr_t)server->handle, (struct sockaddr*)&sa, &salen);
+    fcntl((int)(intptr_t)server->handle, F_SETFL, flags); // restore original flags
     if (s < 0) return -1;
     client->handle = (void*)(intptr_t)s;
 #endif
