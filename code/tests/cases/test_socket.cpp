@@ -88,10 +88,10 @@ FOSSIL_TEST(cpp_socket_test_socket_blocking_option) {
 
 FOSSIL_TEST(cpp_socket_test_socket_address_parse_and_to_string) {
     fossil_net_address_t addr;
-    int rc = fossil_net_socket_address_parse(&addr, "127.0.0.1", 8080);
+    int rc = fossil::net::Socket::address_parse(&addr, "127.0.0.1", 8080);
     ASSUME_ITS_TRUE(rc == 0);
     char buf[128];
-    rc = fossil_net_socket_address_to_string(&addr, buf, sizeof(buf));
+    rc = fossil::net::Socket::address_to_string(&addr, buf, sizeof(buf));
     ASSUME_ITS_TRUE(rc == 0);
     ASSUME_ITS_TRUE(strstr(buf, "127.0.0.1") != NULL);
 }
@@ -101,7 +101,7 @@ FOSSIL_TEST(cpp_socket_test_socket_bind_and_listen_ipv6) {
     fossil_net_address_t addr;
     int rc = sock.socket_create("tcp", "ipv6");
     ASSUME_ITS_TRUE(rc == 0);
-    rc = fossil_net_socket_address_parse(&addr, "::1", 0);
+    rc = fossil::net::Socket::address_parse(&addr, "::1", 0);
     ASSUME_ITS_TRUE(rc == 0);
     rc = sock.socket_bind(&addr);
     ASSUME_ITS_TRUE(rc == 0);
@@ -112,20 +112,29 @@ FOSSIL_TEST(cpp_socket_test_socket_bind_and_listen_ipv6) {
 
 FOSSIL_TEST(cpp_socket_test_socket_macpp_get_and_to_string) {
     fossil_net_mac_t mac;
-    int rc = fossil_net_socket_mac_get(&mac);
+    int rc = fossil::net::Socket::mac_get(&mac);
+#if defined(_WIN32) || defined(__linux__)
     ASSUME_ITS_TRUE(rc == 0);
+    // Check that the MAC address string is in the correct format
     char buf[32];
-    rc = fossil_net_socket_mac_to_string(&mac, buf, sizeof(buf));
+    rc = fossil::net::Socket::mac_to_string(&mac, buf, sizeof(buf));
     ASSUME_ITS_TRUE(rc == 0);
-    ASSUME_ITS_TRUE(strlen(buf) >= 11); // "AA:BB:CC:DD:EE:FF"
+    // MAC address should be 17 characters: "AA:BB:CC:DD:EE:FF"
+    ASSUME_ITS_TRUE(strlen(buf) == 17);
+    // Check that colons are in the right places
+    ASSUME_ITS_TRUE(buf[2] == ':' && buf[5] == ':' && buf[8] == ':' && buf[11] == ':' && buf[14] == ':');
+#else
+    // Not supported on this platform
+    ASSUME_ITS_TRUE(rc == -1);
+#endif
 }
 
 FOSSIL_TEST(cpp_socket_test_socket_resolve_and_hostname) {
     fossil_net_address_t addr;
-    int rc = fossil_net_socket_resolve("localhost", &addr);
+    int rc = fossil::net::Socket::resolve("localhost", &addr);
     ASSUME_ITS_TRUE(rc == 0);
     char hostname[128];
-    rc = fossil_net_socket_hostname(hostname, sizeof(hostname));
+    rc = fossil::net::Socket::hostname(hostname, sizeof(hostname));
     ASSUME_ITS_TRUE(rc == 0);
     ASSUME_ITS_TRUE(strlen(hostname) > 0);
 }
@@ -135,14 +144,14 @@ FOSSIL_TEST(cpp_socket_test_socket_poll_timeout) {
     int rc = sock.socket_create("tcp", "ipv4");
     ASSUME_ITS_TRUE(rc == 0);
     fossil_net_socket_t *socks[1] = { sock.native_handle() };
-    int ready = fossil_net_socket_poll(socks, 1, 100);
+    int ready = fossil::net::Socket::poll(socks, 1, 100);
     ASSUME_ITS_TRUE(ready == 0 || ready == -1);
     sock.socket_close();
 }
 
 FOSSIL_TEST(cpp_socket_test_socket_error_string) {
-    int err = fossil_net_socket_error_last();
-    const char *msg = fossil_net_socket_error_string(err);
+    int err = fossil::net::Socket::error_last();
+    const char *msg = fossil::net::Socket::error_string(err);
     ASSUME_ITS_TRUE(msg != NULL);
 }
 
