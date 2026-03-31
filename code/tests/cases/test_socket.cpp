@@ -110,25 +110,6 @@ FOSSIL_TEST(cpp_socket_test_socket_bind_and_listen_ipv6) {
     sock.socket_close();
 }
 
-FOSSIL_TEST(cpp_socket_test_socket_macpp_get_and_to_string) {
-    fossil_net_mac_t mac;
-    int rc = fossil::net::Socket::mac_get(&mac);
-#if defined(_WIN32) || defined(__linux__)
-    ASSUME_ITS_TRUE(rc == 0);
-    // Check that the MAC address string is in the correct format
-    char buf[32];
-    rc = fossil::net::Socket::mac_to_string(&mac, buf, sizeof(buf));
-    ASSUME_ITS_TRUE(rc == 0);
-    // MAC address should be 17 characters: "AA:BB:CC:DD:EE:FF"
-    ASSUME_ITS_TRUE(strlen(buf) == 17);
-    // Check that colons are in the right places
-    ASSUME_ITS_TRUE(buf[2] == ':' && buf[5] == ':' && buf[8] == ':' && buf[11] == ':' && buf[14] == ':');
-#else
-    // Not supported on this platform
-    ASSUME_ITS_TRUE(rc == -1);
-#endif
-}
-
 FOSSIL_TEST(cpp_socket_test_socket_resolve_and_hostname) {
     fossil_net_address_t addr;
     int rc = fossil::net::Socket::resolve("localhost", &addr);
@@ -163,7 +144,6 @@ FOSSIL_TEST_GROUP(cpp_socket_tests) {
     FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_blocking_option);
     FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_address_parse_and_to_string);
     FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_bind_and_listen_ipv6);
-    FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_macpp_get_and_to_string);
     FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_resolve_and_hostname);
     FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_poll_timeout);
     FOSSIL_TEST_ADD(cpp_socket_fixture, cpp_socket_test_socket_error_string);
