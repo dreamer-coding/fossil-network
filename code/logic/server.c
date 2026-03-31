@@ -41,7 +41,7 @@ fossil_net_server_t *fossil_net_server_create(
     uint16_t port)
 {
     fossil_net_server_t *server = calloc(1, sizeof(fossil_net_server_t));
-    if (!server)
+    if (!server || strcmp(family, "ipv4") != 0 && strcmp(family, "ipv6") != 0 || strcmp(type, "tcp") != 0 && strcmp(type, "udp") != 0 || strcmp(type, "raw") != 0)
         return NULL;
 
     // Initialize address structure
