@@ -24,18 +24,10 @@
  */
 #include "fossil/network/client.h"
 
-//
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <errno.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
 
 typedef struct fossil_net_client {
     fossil_net_socket_t sock;
