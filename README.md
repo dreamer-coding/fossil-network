@@ -1,11 +1,11 @@
 # **Fossil Network by Fossil Logic**
 
-**Fossil Network** is a portable, cross-platform C library for sockets and networking, designed for efficiency, reliability, and zero external dependencies. It uses string-based type IDs (e.g., `fossil.net.socket.type.tcp`, `fossil.net.family.ipv4`) for socket types, address families, and options, providing a modern, unified API for Windows, macOS, BSD, and Linux.
+**Fossil Network** is a portable, cross-platform C library for sockets and networking, designed for efficiency, reliability, and zero external dependencies. It uses string-based type IDs (e.g., `tcp`, `ipv4`) for socket types, address families, and options, providing a modern, unified API for Windows, macOS, BSD, and Linux.
 
 ### Key Features
 
 - **String-Based Type and Option IDs**  
-  Socket types (`fossil.net.socket.type.tcp`, `fossil.net.socket.type.udp`, `fossil.net.socket.type.raw`), address families (`fossil.net.family.ipv4`, `fossil.net.family.ipv6`), and options (`fossil.net.socket.blocking`, `fossil.net.socket.reuseaddr`) are referenced by string IDs for clarity and extensibility.
+  Socket types (`tcp`, `udp`, `raw`), address families (`ipv4`, `ipv6`) are referenced by string IDs for clarity and extensibility.
 
 - **Unified Core Structures**  
   Core types like `fossil_net_socket_t`, `fossil_net_address_t`, and `fossil_net_mac_t` abstract platform-specific details, including socket handles, IDs, types, families, and MAC addresses.
