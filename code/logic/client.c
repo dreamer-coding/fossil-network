@@ -39,7 +39,9 @@ typedef struct fossil_net_client {
 
 fossil_net_client_t *fossil_net_client_create(const char *type, const char *family) {
     fossil_net_client_t *client = calloc(1, sizeof(fossil_net_client_t));
-    if (!client || strcmp(family, "ipv4") != 0 && strcmp(family, "ipv6") != 0 || strcmp(type, "tcp") != 0 && strcmp(type, "udp") != 0 || strcmp(type, "raw") != 0) {
+    if (!client ||
+        ((strcmp(family, "ipv4") != 0) && (strcmp(family, "ipv6") != 0)) ||
+        ((strcmp(type, "tcp") != 0) && (strcmp(type, "udp") != 0) && (strcmp(type, "raw") != 0))) {
         free(client);
         return NULL;
     }
