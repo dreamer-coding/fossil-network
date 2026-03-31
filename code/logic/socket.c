@@ -36,7 +36,7 @@
 #include <windows.h>
 #include <iphlpapi.h>
 #include <process.h>
-#include <ws2tcpip.h>
+#include <ws2tcpip.h> // Required for struct addrinfo and getaddrinfo on Windows
 #else
 #include <ifaddrs.h>
 #include <net/if.h>
@@ -46,9 +46,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-
 #include <arpa/inet.h>
-#include <netdb.h> // Required for struct addrinfo and getaddrinfo
+#include <netdb.h>
 #include <errno.h>
 #include <fcntl.h>
 #if defined(__linux__)
@@ -176,26 +175,36 @@ int fossil_net_socket_bind(fossil_net_socket_t *sock, const fossil_net_address_t
     socklen_t salen;
 
     memset(&sa, 0, sizeof(sa));
-    if (!strcmp(addr->family, "ipv4") || !strcmp(addr->family, "ipv4")) {
+    if (!strcmp(addr->family, "ipv4")) {
         struct sockaddr_in *s4 = (struct sockaddr_in*)&sa;
         s4->sin_family = AF_INET;
         s4->sin_port = htons(addr->port);
         inet_pton(AF_INET, addr->ip, &s4->sin_addr);
         salen = sizeof(*s4);
-    } else {
+    } else if (!strcmp(addr->family, "ipv6")) {
         struct sockaddr_in6 *s6 = (struct sockaddr_in6*)&sa;
         s6->sin6_family = AF_INET6;
         s6->sin6_port = htons(addr->port);
         inet_pton(AF_INET6, addr->ip, &s6->sin6_addr);
         salen = sizeof(*s6);
+    } else {
+        return -1;
     }
 
+#if defined(_WIN32)
+    return bind((SOCKET)sock->handle, (struct sockaddr*)&sa, salen);
+#else
     return bind((int)(intptr_t)sock->handle, (struct sockaddr*)&sa, salen);
+#endif
 }
 
 int fossil_net_socket_listen(fossil_net_socket_t *sock, int backlog) {
     if (!sock) return -1;
+#if defined(_WIN32)
+    return listen((SOCKET)sock->handle, backlog);
+#else
     return listen((int)(intptr_t)sock->handle, backlog);
+#endif
 }
 
 int fossil_net_socket_accept(fossil_net_socket_t *server, fossil_net_socket_t *client, fossil_net_address_t *addr) {
@@ -215,17 +224,21 @@ int fossil_net_socket_accept(fossil_net_socket_t *server, fossil_net_socket_t *c
 #endif
 
     if (addr) {
+        memset(addr, 0, sizeof(*addr));
         if (sa.ss_family == AF_INET) {
             struct sockaddr_in *s4 = (struct sockaddr_in*)&sa;
             inet_ntop(AF_INET, &s4->sin_addr, addr->ip, sizeof(addr->ip));
             addr->port = ntohs(s4->sin_port);
             strncpy(addr->family, "ipv4", sizeof(addr->family)-1);
-        } else {
+        }
+#if defined(AF_INET6)
+        else if (sa.ss_family == AF_INET6) {
             struct sockaddr_in6 *s6 = (struct sockaddr_in6*)&sa;
             inet_ntop(AF_INET6, &s6->sin6_addr, addr->ip, sizeof(addr->ip));
             addr->port = ntohs(s6->sin6_port);
             strncpy(addr->family, "ipv6", sizeof(addr->family)-1);
         }
+#endif
     }
     return 0;
 }
@@ -235,21 +248,28 @@ int fossil_net_socket_connect(fossil_net_socket_t *sock, const fossil_net_addres
     struct sockaddr_storage sa;
     socklen_t salen;
 
-    memset(&sa,0,sizeof(sa));
-    if (!strcmp(addr->family,"ipv4") || !strcmp(addr->family,"ipv4")) {
+    memset(&sa, 0, sizeof(sa));
+    if (!strcmp(addr->family, "ipv4")) {
         struct sockaddr_in *s4 = (struct sockaddr_in*)&sa;
         s4->sin_family = AF_INET;
         s4->sin_port = htons(addr->port);
         inet_pton(AF_INET, addr->ip, &s4->sin_addr);
         salen = sizeof(*s4);
-    } else {
+    } else if (!strcmp(addr->family, "ipv6")) {
         struct sockaddr_in6 *s6 = (struct sockaddr_in6*)&sa;
         s6->sin6_family = AF_INET6;
         s6->sin6_port = htons(addr->port);
         inet_pton(AF_INET6, addr->ip, &s6->sin6_addr);
         salen = sizeof(*s6);
+    } else {
+        return -1;
     }
-    return connect((int)(intptr_t)sock->handle,(struct sockaddr*)&sa,salen);
+
+#if defined(_WIN32)
+    return connect((SOCKET)sock->handle, (struct sockaddr*)&sa, salen);
+#else
+    return connect((int)(intptr_t)sock->handle, (struct sockaddr*)&sa, salen);
+#endif
 }
 
 /*=============================================================================
@@ -325,16 +345,19 @@ int fossil_net_socket_address_to_string(
 {
     if (!addr || !buffer || size == 0) return -1;
 
+    // Prefer addr->addr if set, otherwise use addr->ip
+    const char *ipstr = addr->addr[0] ? addr->addr : addr->ip;
+
     if (!strcmp(addr->family, "ipv4")) {
         // IPv4: "x.x.x.x:port"
-        int n = snprintf(buffer, size, "%s:%u", addr->ip, addr->port);
+        int n = snprintf(buffer, size, "%s:%u", ipstr, addr->port);
         if (n < 0 || (uint32_t)n >= size) return -1;
         return 0;
     }
 #if defined(AF_INET6)
     else if (!strcmp(addr->family, "ipv6")) {
         // IPv6: "[addr]:port"
-        int n = snprintf(buffer, size, "[%s]:%u", addr->ip, addr->port);
+        int n = snprintf(buffer, size, "[%s]:%u", ipstr, addr->port);
         if (n < 0 || (uint32_t)n >= size) return -1;
         return 0;
     }
@@ -365,6 +388,7 @@ int fossil_net_socket_get_local_address(
     if (sa.ss_family == AF_INET) {
         struct sockaddr_in *s4 = (struct sockaddr_in *)&sa;
         inet_ntop(AF_INET, &s4->sin_addr, addr->ip, sizeof(addr->ip));
+        inet_ntop(AF_INET, &s4->sin_addr, addr->addr, sizeof(addr->addr));
         addr->port = ntohs(s4->sin_port);
         strncpy(addr->family, "ipv4", sizeof(addr->family) - 1);
         return 0;
@@ -373,6 +397,7 @@ int fossil_net_socket_get_local_address(
     else if (sa.ss_family == AF_INET6) {
         struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)&sa;
         inet_ntop(AF_INET6, &s6->sin6_addr, addr->ip, sizeof(addr->ip));
+        inet_ntop(AF_INET6, &s6->sin6_addr, addr->addr, sizeof(addr->addr));
         addr->port = ntohs(s6->sin6_port);
         strncpy(addr->family, "ipv6", sizeof(addr->family) - 1);
         return 0;
@@ -474,36 +499,44 @@ DNS / HOST
 int fossil_net_socket_resolve(const char *hostname, fossil_net_address_t *out_addr) {
     if (!hostname || !out_addr) return -1;
 
-    struct hostent *he = gethostbyname(hostname);
-    if (!he) return -1;
+    memset(out_addr, 0, sizeof(*out_addr));
 
-    if (he->h_addrtype == AF_INET) {
-        struct in_addr **addr_list = (struct in_addr **)he->h_addr_list;
-        if (addr_list[0]) {
-            inet_ntop(AF_INET, addr_list[0], out_addr->ip, sizeof(out_addr->ip));
-            out_addr->port = 0;
-            strncpy(out_addr->family, "ipv4", sizeof(out_addr->family)-1);
-        } else {
-            return -1;
-        }
+    // Try IPv4 first
+    struct in_addr ipv4;
+    if (inet_pton(AF_INET, hostname, &ipv4) == 1) {
+        strncpy(out_addr->ip, hostname, sizeof(out_addr->ip) - 1);
+        strncpy(out_addr->addr, hostname, sizeof(out_addr->addr) - 1);
+        out_addr->port = 0;
+        strncpy(out_addr->family, "ipv4", sizeof(out_addr->family) - 1);
+        return 0;
     }
 #if defined(AF_INET6)
-    else if (he->h_addrtype == AF_INET6) {
-        struct in6_addr **addr_list6 = (struct in6_addr **)he->h_addr_list;
-        if (addr_list6[0]) {
-            inet_ntop(AF_INET6, addr_list6[0], out_addr->ip, sizeof(out_addr->ip));
-            out_addr->port = 0;
-            strncpy(out_addr->family, "ipv6", sizeof(out_addr->family)-1);
-        } else {
-            return -1;
-        }
+    struct in6_addr ipv6;
+    if (inet_pton(AF_INET6, hostname, &ipv6) == 1) {
+        strncpy(out_addr->ip, hostname, sizeof(out_addr->ip) - 1);
+        strncpy(out_addr->addr, hostname, sizeof(out_addr->addr) - 1);
+        out_addr->port = 0;
+        strncpy(out_addr->family, "ipv6", sizeof(out_addr->family) - 1);
+        return 0;
     }
 #endif
-    else {
-        return -1;
+
+    // Fallback: use gethostbyname (IPv4 only, legacy)
+    struct hostent *he = gethostbyname(hostname);
+    if (he && he->h_addrtype == AF_INET && he->h_length == 4) {
+        struct in_addr *addr_in = (struct in_addr *)he->h_addr_list[0];
+        if (addr_in) {
+            inet_ntop(AF_INET, addr_in, out_addr->ip, sizeof(out_addr->ip));
+            strncpy(out_addr->addr, out_addr->ip, sizeof(out_addr->addr) - 1);
+            out_addr->port = 0;
+            strncpy(out_addr->family, "ipv4", sizeof(out_addr->family) - 1);
+            return 0;
+        }
     }
 
-    return 0;
+    // No IPv6 fallback for gethostbyname; gethostbyname2 is not portable
+
+    return -1;
 }
 
 int fossil_net_socket_hostname(char *buffer, uint32_t size) {
@@ -541,7 +574,7 @@ int fossil_net_socket_get_peer_address(
     memset(&sa, 0, sizeof(sa));
 
 #if defined(_WIN32)
-    int fd = (int)(intptr_t)sock->handle;
+    SOCKET fd = (SOCKET)sock->handle;
 #else
     int fd = (int)(intptr_t)sock->handle;
 #endif
@@ -553,6 +586,7 @@ int fossil_net_socket_get_peer_address(
     if (sa.ss_family == AF_INET) {
         struct sockaddr_in *s4 = (struct sockaddr_in *)&sa;
         inet_ntop(AF_INET, &s4->sin_addr, addr->ip, sizeof(addr->ip));
+        inet_ntop(AF_INET, &s4->sin_addr, addr->addr, sizeof(addr->addr));
         addr->port = ntohs(s4->sin_port);
         strncpy(addr->family, "ipv4", sizeof(addr->family) - 1);
         return 0;
@@ -561,6 +595,7 @@ int fossil_net_socket_get_peer_address(
     else if (sa.ss_family == AF_INET6) {
         struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)&sa;
         inet_ntop(AF_INET6, &s6->sin6_addr, addr->ip, sizeof(addr->ip));
+        inet_ntop(AF_INET6, &s6->sin6_addr, addr->addr, sizeof(addr->addr));
         addr->port = ntohs(s6->sin6_port);
         strncpy(addr->family, "ipv6", sizeof(addr->family) - 1);
         return 0;

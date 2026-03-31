@@ -44,14 +44,31 @@ fossil_net_server_t *fossil_net_server_create(
     if (!server ||
         ((strcmp(family, "ipv4") != 0) && (strcmp(family, "ipv6") != 0)) ||
         ((strcmp(type, "tcp") != 0) && (strcmp(type, "udp") != 0) && (strcmp(type, "raw") != 0)))
+    {
+        free(server);
         return NULL;
+    }
 
     // Initialize address structure
     memset(&server->addr, 0, sizeof(fossil_net_address_t));
     strncpy(server->addr.family, family, sizeof(server->addr.family) - 1);
-    if (fossil_net_socket_address_parse(&server->addr, addr, port) != 0) {
-        free(server);
-        return NULL;
+
+    // If addr is NULL, bind to any address (INADDR_ANY or in6addr_any)
+    if (addr == NULL) {
+        if (strcmp(family, "ipv4") == 0) {
+            strncpy(server->addr.addr, "0.0.0.0", sizeof(server->addr.addr) - 1);
+        } else if (strcmp(family, "ipv6") == 0) {
+            strncpy(server->addr.addr, "::", sizeof(server->addr.addr) - 1);
+        } else {
+            // Unknown family, fallback to empty string
+            server->addr.ip[0] = '\0';
+        }
+        server->addr.port = port;
+    } else {
+        if (fossil_net_socket_address_parse(&server->addr, addr, port) != 0) {
+            free(server);
+            return NULL;
+        }
     }
 
     // Create socket with type/family string IDs

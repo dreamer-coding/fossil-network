@@ -65,6 +65,7 @@ typedef struct fossil_net_address
 {
     char ip[64]; /* IPv4 or IPv6 string */
     uint16_t port;
+    char addr[64];
     char family[32];
 } fossil_net_address_t;
 
