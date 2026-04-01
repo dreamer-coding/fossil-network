@@ -7,7 +7,8 @@ fossil_network_lib = library(
     files(
         'socket.c',
         'server.c',
-        'client.c'
+        'client.c',
+        'request.c'
     ),
     install: true,
     dependencies: platform_deps,
