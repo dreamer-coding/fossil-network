@@ -201,7 +201,7 @@ static int fossil__http_build_request(
     uint32_t offset = 0;
 
     /* Ensure path */
-    const char *path = (req->url && req->url[0]) ? req->url : "/";
+    const char *path = (req->url[0] != '\0') ? req->url : "/";
 
     /* Request line */
     int n = snprintf(buffer + offset, size - offset,
