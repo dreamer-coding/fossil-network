@@ -195,45 +195,93 @@ static int fossil__http_build_request(
     uint32_t size,
     uint32_t *out_size)
 {
-    if (!req || !buffer || !out_size)
+    if (!req || !buffer || !out_size || size == 0)
         return -1;
 
     uint32_t offset = 0;
 
-    /* Request line */
-    offset += snprintf(buffer + offset, size - offset,
-        "%s %s HTTP/1.1\r\n",
-        req->method,
-        req->url);
+    /* Ensure path */
+    const char *path = (req->url && req->url[0]) ? req->url : "/";
 
-    /* Headers */
+    /* Request line */
+    int n = snprintf(buffer + offset, size - offset,
+        "%s %s HTTP/1.1\r\n", req->method, path);
+    if (n < 0 || (uint32_t)n >= size - offset)
+        return -1;
+    offset += (uint32_t)n;
+
+    /* Detect required headers */
+    int has_host = 0;
+    int has_connection = 0;
+
     for (uint32_t i = 0; i < req->header_count; i++)
     {
-        offset += snprintf(buffer + offset, size - offset,
+        if (strcmp(req->headers[i].key, "Host") == 0)
+            has_host = 1;
+        if (strcmp(req->headers[i].key, "Connection") == 0)
+            has_connection = 1;
+    }
+
+    /* Add Host (placeholder until URL parser exists) */
+    if (!has_host)
+    {
+        n = snprintf(buffer + offset, size - offset,
+            "Host: localhost\r\n");
+        if (n < 0 || (uint32_t)n >= size - offset)
+            return -1;
+        offset += (uint32_t)n;
+    }
+
+    /* Add Connection */
+    if (!has_connection)
+    {
+        n = snprintf(buffer + offset, size - offset,
+            "Connection: close\r\n");
+        if (n < 0 || (uint32_t)n >= size - offset)
+            return -1;
+        offset += (uint32_t)n;
+    }
+
+    /* User headers */
+    for (uint32_t i = 0; i < req->header_count; i++)
+    {
+        n = snprintf(buffer + offset, size - offset,
             "%s: %s\r\n",
             req->headers[i].key,
             req->headers[i].value);
+
+        if (n < 0 || (uint32_t)n >= size - offset)
+            return -1;
+
+        offset += (uint32_t)n;
     }
 
-    /* Content-Type */
+    /* Body headers */
     if (req->body && req->body_size > 0)
     {
-        offset += snprintf(buffer + offset, size - offset,
-            "Content-Type: %s\r\n",
-            req->content_type);
+        n = snprintf(buffer + offset, size - offset,
+            "Content-Type: %s\r\n", req->content_type);
+        if (n < 0 || (uint32_t)n >= size - offset)
+            return -1;
+        offset += (uint32_t)n;
 
-        offset += snprintf(buffer + offset, size - offset,
-            "Content-Length: %u\r\n",
-            req->body_size);
+        n = snprintf(buffer + offset, size - offset,
+            "Content-Length: %u\r\n", req->body_size);
+        if (n < 0 || (uint32_t)n >= size - offset)
+            return -1;
+        offset += (uint32_t)n;
     }
 
     /* End headers */
-    offset += snprintf(buffer + offset, size - offset, "\r\n");
+    n = snprintf(buffer + offset, size - offset, "\r\n");
+    if (n < 0 || (uint32_t)n >= size - offset)
+        return -1;
+    offset += (uint32_t)n;
 
     /* Body */
     if (req->body && req->body_size > 0)
     {
-        if (offset + req->body_size >= size)
+        if (offset + req->body_size > size)
             return -1;
 
         memcpy(buffer + offset, req->body, req->body_size);
