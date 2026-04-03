@@ -128,19 +128,19 @@ FOSSIL_TEST(cpp_client_test_send_and_receive) {
     // Send from client to server
     const char msg[] = "hello";
     uint32_t sent = 0;
-    rc = client.send(msg, sizeof(msg), &sent);
-    ASSUME_ITS_TRUE(rc == 0 && sent == sizeof(msg));
+    rc = client.send(msg, strlen(msg) + 1, &sent);
+    ASSUME_ITS_TRUE(rc == 0 && sent == strlen(msg) + 1);
 
     char buf[32] = {0};
     uint32_t recvd = 0;
     rc = fossil_net_socket_receive(&accepted, buf, sizeof(buf), &recvd);
-    ASSUME_ITS_TRUE(rc == 0 && recvd == sizeof(msg));
+    ASSUME_ITS_TRUE(rc == 0 && recvd == strlen(msg) + 1);
     ASSUME_ITS_TRUE(strcmp(buf, msg) == 0);
 
     // Send from server to client
     const char reply[] = "world";
-    rc = fossil_net_socket_send(&accepted, reply, sizeof(reply), &sent);
-    ASSUME_ITS_TRUE(rc == 0 && sent == sizeof(reply));
+    rc = fossil_net_socket_send(&accepted, reply, strlen(reply) + 1, &sent);
+    ASSUME_ITS_TRUE(rc == 0 && sent == strlen(reply) + 1);
 
     memset(buf, 0, sizeof(buf));
     rc = client.receive(buf, sizeof(buf), &recvd);
