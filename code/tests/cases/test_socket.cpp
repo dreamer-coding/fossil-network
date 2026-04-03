@@ -54,19 +54,31 @@ FOSSIL_TEST(cpp_socket_test_socket_create_types_and_families) {
     fossil::net::Socket sock;
     // TCP IPv4
     int rc = sock.socket_create("tcp", "ipv4");
-    ASSUME_ITS_TRUE(rc == 0);
+    if (rc != 0) {
+        const char *err_msg = fossil::net::Socket::error_string(fossil::net::Socket::error_last());
+        ASSUME_ITS_TRUE_MESSAGE(rc == 0, err_msg);
+    }
     sock.socket_close();
     // TCP IPv6
     rc = sock.socket_create("tcp", "ipv6");
-    ASSUME_ITS_TRUE(rc == 0);
+    if (rc != 0) {
+        const char *err_msg = fossil::net::Socket::error_string(fossil::net::Socket::error_last());
+        ASSUME_ITS_TRUE_MESSAGE(rc == 0, err_msg);
+    }
     sock.socket_close();
     // UDP IPv4
     rc = sock.socket_create("udp", "ipv4");
-    ASSUME_ITS_TRUE(rc == 0);
+    if (rc != 0) {
+        const char *err_msg = fossil::net::Socket::error_string(fossil::net::Socket::error_last());
+        ASSUME_ITS_TRUE_MESSAGE(rc == 0, err_msg);
+    }
     sock.socket_close();
     // UDP IPv6
     rc = sock.socket_create("udp", "ipv6");
-    ASSUME_ITS_TRUE(rc == 0);
+    if (rc != 0) {
+        const char *err_msg = fossil::net::Socket::error_string(fossil::net::Socket::error_last());
+        ASSUME_ITS_TRUE_MESSAGE(rc == 0, err_msg);
+    }
     sock.socket_close();
     // RAW IPv4
     rc = sock.socket_create("raw", "ipv4");
@@ -78,7 +90,11 @@ FOSSIL_TEST(cpp_socket_test_socket_create_types_and_families) {
 FOSSIL_TEST(cpp_socket_test_socket_blocking_option) {
     fossil::net::Socket sock;
     int rc = sock.socket_create("tcp", "ipv4");
-    ASSUME_ITS_TRUE(rc == 0);
+    if (rc != 0) {
+        const char *err_msg = fossil::net::Socket::error_string(fossil::net::Socket::error_last());
+        ASSUME_ITS_TRUE_MESSAGE(rc == 0, err_msg);
+        return;
+    }
     rc = sock.socket_set_blocking(false);
     ASSUME_ITS_TRUE(rc == 0);
     rc = sock.socket_set_blocking(true);
@@ -89,7 +105,11 @@ FOSSIL_TEST(cpp_socket_test_socket_blocking_option) {
 FOSSIL_TEST(cpp_socket_test_socket_address_parse_and_to_string) {
     fossil_net_address_t addr;
     int rc = fossil::net::Socket::address_parse(&addr, "127.0.0.1", 8080);
-    ASSUME_ITS_TRUE(rc == 0);
+    if (rc != 0) {
+        const char *err_msg = fossil::net::Socket::error_string(fossil::net::Socket::error_last());
+        ASSUME_ITS_TRUE_MESSAGE(rc == 0, err_msg);
+        return;
+    }
     char buf[128];
     rc = fossil::net::Socket::address_to_string(&addr, buf, sizeof(buf));
     ASSUME_ITS_TRUE(rc == 0);
@@ -100,7 +120,11 @@ FOSSIL_TEST(cpp_socket_test_socket_bind_and_listen_ipv6) {
     fossil::net::Socket sock;
     fossil_net_address_t addr;
     int rc = sock.socket_create("tcp", "ipv6");
-    ASSUME_ITS_TRUE(rc == 0);
+    if (rc != 0) {
+        const char *err_msg = fossil::net::Socket::error_string(fossil::net::Socket::error_last());
+        ASSUME_ITS_TRUE_MESSAGE(rc == 0, err_msg);
+        return;
+    }
     rc = fossil::net::Socket::address_parse(&addr, "::1", 0);
     ASSUME_ITS_TRUE(rc == 0);
     rc = sock.socket_bind(&addr);
@@ -113,7 +137,11 @@ FOSSIL_TEST(cpp_socket_test_socket_bind_and_listen_ipv6) {
 FOSSIL_TEST(cpp_socket_test_socket_resolve_and_hostname) {
     fossil_net_address_t addr;
     int rc = fossil::net::Socket::resolve("localhost", &addr);
-    ASSUME_ITS_TRUE(rc == 0);
+    if (rc != 0) {
+        const char *err_msg = fossil::net::Socket::error_string(fossil::net::Socket::error_last());
+        ASSUME_ITS_TRUE_MESSAGE(rc == 0, err_msg);
+        return;
+    }
     char hostname[128];
     rc = fossil::net::Socket::hostname(hostname, sizeof(hostname));
     ASSUME_ITS_TRUE(rc == 0);
@@ -123,7 +151,11 @@ FOSSIL_TEST(cpp_socket_test_socket_resolve_and_hostname) {
 FOSSIL_TEST(cpp_socket_test_socket_poll_timeout) {
     fossil::net::Socket sock;
     int rc = sock.socket_create("tcp", "ipv4");
-    ASSUME_ITS_TRUE(rc == 0);
+    if (rc != 0) {
+        const char *err_msg = fossil::net::Socket::error_string(fossil::net::Socket::error_last());
+        ASSUME_ITS_TRUE_MESSAGE(rc == 0, err_msg);
+        return;
+    }
     fossil_net_socket_t *socks[1] = { sock.native_handle() };
     int ready = fossil::net::Socket::poll(socks, 1, 100);
     ASSUME_ITS_TRUE(ready == 0 || ready == -1);
