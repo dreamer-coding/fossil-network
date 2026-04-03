@@ -189,6 +189,61 @@ int fossil_net_response_get_header(
 HTTP SERIALIZATION
 =============================================================================*/
 
+typedef struct {
+    char scheme[16];
+    char host[256];
+    uint16_t port;
+    char path[1024];
+} fossil_url_t;
+
+static int fossil__url_parse(const char *url, fossil_url_t *parsed) {
+    if (!url || !parsed) return -1;
+
+    char temp[2048];
+    fossil__safe_copy(temp, url, sizeof(temp));
+
+    char *scheme_end = strstr(temp, "://");
+    if (!scheme_end) {
+        // assume http
+        strcpy(parsed->scheme, "http");
+        fossil__safe_copy(parsed->host, temp, sizeof(parsed->host));
+        char *path_start = strchr(parsed->host, '/');
+        if (path_start) {
+            fossil__safe_copy(parsed->path, path_start, sizeof(parsed->path));
+            *path_start = '\0';
+        } else {
+            strcpy(parsed->path, "/");
+        }
+        char *port_start = strchr(parsed->host, ':');
+        if (port_start) {
+            *port_start = '\0';
+            parsed->port = atoi(port_start + 1);
+        } else {
+            parsed->port = 80;
+        }
+        return 0;
+    }
+    *scheme_end = '\0';
+    fossil__safe_copy(parsed->scheme, temp, sizeof(parsed->scheme));
+    char *host_start = scheme_end + 3;
+    char *path_start = strchr(host_start, '/');
+    if (path_start) {
+        fossil__safe_copy(parsed->path, path_start, sizeof(parsed->path));
+        *path_start = '\0';
+    } else {
+        strcpy(parsed->path, "/");
+    }
+    char *port_start = strchr(host_start, ':');
+    if (port_start) {
+        *port_start = '\0';
+        parsed->port = atoi(port_start + 1);
+    } else {
+        parsed->port = strcmp(parsed->scheme, "https") == 0 ? 443 : 80;
+    }
+    fossil__safe_copy(parsed->host, host_start, sizeof(parsed->host));
+    return 0;
+}
+
 static int fossil__http_build_request(
     const fossil_net_request_t *req,
     char *buffer,
@@ -200,8 +255,24 @@ static int fossil__http_build_request(
 
     uint32_t offset = 0;
 
-    /* Ensure path */
-    const char *path = (req->url[0] != '\0') ? req->url : "/";
+    /* Parse URL for path and host support */
+    fossil_url_t parsed_url;
+    memset(&parsed_url, 0, sizeof(parsed_url));
+    const char *path = "/";
+    int parsed_host_available = 0;
+
+    if (req->url[0] != '\0')
+    {
+        if (fossil__url_parse(req->url, &parsed_url) == 0 && parsed_url.host[0] != '\0')
+        {
+            parsed_host_available = 1;
+            path = (parsed_url.path[0] != '\0') ? parsed_url.path : "/";
+        }
+        else
+        {
+            path = req->url;
+        }
+    }
 
     /* Request line */
     int n = snprintf(buffer + offset, size - offset,
@@ -222,11 +293,30 @@ static int fossil__http_build_request(
             has_connection = 1;
     }
 
-    /* Add Host (placeholder until URL parser exists) */
+    /* Add Host */
     if (!has_host)
     {
-        n = snprintf(buffer + offset, size - offset,
-            "Host: localhost\r\n");
+        if (parsed_host_available)
+        {
+            if ((strcmp(parsed_url.scheme, "http") == 0 && parsed_url.port != 80) ||
+                (strcmp(parsed_url.scheme, "https") == 0 && parsed_url.port != 443) ||
+                (parsed_url.port == 0))
+            {
+                n = snprintf(buffer + offset, size - offset,
+                    "Host: %s:%u\r\n", parsed_url.host, parsed_url.port);
+            }
+            else
+            {
+                n = snprintf(buffer + offset, size - offset,
+                    "Host: %s\r\n", parsed_url.host);
+            }
+        }
+        else
+        {
+            n = snprintf(buffer + offset, size - offset,
+                "Host: localhost\r\n");
+        }
+
         if (n < 0 || (uint32_t)n >= size - offset)
             return -1;
         offset += (uint32_t)n;
