@@ -129,24 +129,24 @@ FOSSIL_TEST(c_client_test_send_and_receive) {
     // Send from client to server
     const char msg[] = "hello";
     uint32_t sent = 0;
-    rc = fossil_net_client_send(client, msg, sizeof(msg), &sent);
-    ASSUME_ITS_TRUE(rc == 0 && sent == sizeof(msg));
+    rc = fossil_net_client_send(client, msg, strlen(msg), &sent);
+    ASSUME_ITS_TRUE(rc == 0 && sent == strlen(msg));
 
     char buf[32] = {0};
     uint32_t recvd = 0;
     rc = fossil_net_socket_receive(&accepted, buf, sizeof(buf), &recvd);
-    ASSUME_ITS_TRUE(rc == 0 && recvd == sizeof(msg));
-    ASSUME_ITS_TRUE(strcmp(buf, msg) == 0);
+    ASSUME_ITS_TRUE(rc == 0 && recvd == strlen(msg));
+    ASSUME_ITS_TRUE(strncmp(buf, msg, strlen(msg)) == 0);
 
     // Send from server to client
     const char reply[] = "world";
-    rc = fossil_net_socket_send(&accepted, reply, sizeof(reply), &sent);
-    ASSUME_ITS_TRUE(rc == 0 && sent == sizeof(reply));
+    rc = fossil_net_socket_send(&accepted, reply, strlen(reply), &sent);
+    ASSUME_ITS_TRUE(rc == 0 && sent == strlen(reply));
 
     memset(buf, 0, sizeof(buf));
     rc = fossil_net_client_receive(client, buf, sizeof(buf), &recvd);
-    ASSUME_ITS_TRUE(rc == 0 && recvd == sizeof(reply));
-    ASSUME_ITS_TRUE(strcmp(buf, reply) == 0);
+    ASSUME_ITS_TRUE(rc == 0 && recvd == strlen(reply));
+    ASSUME_ITS_TRUE(strncmp(buf, reply, strlen(reply)) == 0);
 
     fossil_net_client_disconnect(client);
     fossil_net_socket_close(&accepted);

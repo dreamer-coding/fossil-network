@@ -28,5 +28,6 @@
 #include "socket.h"
 #include "client.h"
 #include "server.h"
+#include "request.h"
 
 #endif /* FOSSIL_NETWORK_FRAMEWORK_H */
