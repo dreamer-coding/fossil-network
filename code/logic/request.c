@@ -42,8 +42,12 @@ static void fossil__safe_copy(char *dst, const char *src, size_t size)
     if (!dst || size == 0) return;
     if (!src) { dst[0] = '\0'; return; }
 
-    strncpy(dst, src, size - 1);
-    dst[size - 1] = '\0';
+    size_t src_len = strlen(src);
+    size_t copy_len = (src_len >= size) ? (size - 1) : src_len;
+    if (copy_len > 0) {
+        memcpy(dst, src, copy_len);
+    }
+    dst[copy_len] = '\0';
 }
 
 static int fossil__validate_method(const char *method)
