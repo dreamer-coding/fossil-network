@@ -165,7 +165,8 @@ FOSSIL_TEST(cpp_request_test_request_set_body_octet_stream) {
 FOSSIL_TEST(cpp_request_test_response_get_header) {
     fossil_net_response_t res;
     memset(&res, 0, sizeof(res));
-    fossil_net_header_t hdr = {0};
+    fossil_net_header_t hdr;
+    memset(&hdr, 0, sizeof(hdr));
     strcpy(hdr.key, "Content-Type");
     strcpy(hdr.value, "application/json");
     res.headers[0] = hdr;
